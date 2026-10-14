@@ -140,10 +140,10 @@ private Blob 실행 상태 저장 경로도 확인했다.
 
 출처: [경고 상태와 모니터 조건](https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-overview),
 [Action Group과 알림 테스트](https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/action-groups).
-저장소 근거: [지속 부하 검증 스냅샷](artifacts/loadtest/continuous-verification.json),
+저장소 근거(`artifacts/`는 git에 올리지 않는 로컬 실행 결과이므로 링크하지 않고 경로만 표기): 지속 부하 검증 스냅샷(`artifacts/loadtest/continuous-verification.json`),
 [시나리오 생성 및 경고 조건](src/demo-scenarios.ts),
-[예산 경고 정의](artifacts/loadtest/alert-budget.json),
-[이메일 테스트 응답](artifacts/email-test.json), [설정 리소스 참조](artifacts/settings.json).
+예산 경고 정의(`artifacts/loadtest/alert-budget.json`),
+이메일 테스트 응답(`artifacts/email-test.json`), 설정 리소스 참조(`artifacts/settings.json`).
 
 ### 부하 목표와 관측값
 
@@ -173,7 +173,7 @@ duration p95 6,065ms는 다른 분모의 값이다. 작은 데모 표본을 모�
 
 출처: [Azure OpenAI quota와 rate limit 계산](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/quota#understanding-rate-limits).
 저장소 근거: [모델 설정](config/models.json), [부하 설정](config/load-test.json),
-[갱신형 상태 파일](artifacts/loadtest/status.json), [worker 집계](src/load-worker.ts),
+갱신형 상태 파일(`artifacts/loadtest/status.json`), [worker 집계](src/load-worker.ts),
 [부하 요약 수식](src/load-policy.ts).
 
 ## Azure 네이티브 Metrics 읽기
@@ -759,7 +759,7 @@ budget sample이 있더라도 Azure 경고의 Fired 상태 및 inbox delivery는
 
 출처: [Log search alert의 평가](https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-types#log-search-alerts).
 저장소 근거: [budget Properties](src/telemetry.ts),
-[70% scheduled query rule](src/demo-scenarios.ts), [당시 검증](artifacts/loadtest/continuous-verification.json).
+[70% scheduled query rule](src/demo-scenarios.ts), 당시 검증(`artifacts/loadtest/continuous-verification.json`).
 
 ## 운영 팁과 고객 설명
 
@@ -787,7 +787,7 @@ worker는 429가 있었던 wave 이후 60초 대기한다.
 429 유도 시험은 승인된 데모 리소스, 기간, 예산 안에서만 수행한다.
 
 저장소 근거: [SDK retry 설정](src/load-api.ts), [worker backoff](src/load-worker.ts),
-[live 429 증거](artifacts/loadtest/continuous-verification.json).
+live 429 증거(`artifacts/loadtest/continuous-verification.json`).
 
 ### 개인정보와 로그 운영
 
@@ -804,7 +804,7 @@ Audit-only 소스 설정과 정책의 allLogs 설정이 공존하므로,
 
 출처: [Application Insights 개인정보 수집 관리](https://learn.microsoft.com/en-us/azure/azure-monitor/app/data-retention-privacy),
 [서비스 측 데이터 처리](https://learn.microsoft.com/en-us/azure/ai-foundry/responsible-ai/openai/data-privacy).
-저장소 근거: [허용 계측 속성](src/accounting.ts), [forbiddenRows 검증](artifacts/azure-verification.json).
+저장소 근거: [허용 계측 속성](src/accounting.ts), forbiddenRows 검증(`artifacts/azure-verification.json`).
 
 ### 10분 관측 walkthrough
 
@@ -822,8 +822,8 @@ Audit-only 소스 설정과 정책의 allLogs 설정이 공존하므로,
 
 출처: [Metrics를 분석하는 방법](https://learn.microsoft.com/en-us/azure/azure-monitor/metrics/analyze-metrics),
 [경고와 Action Group](https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/action-groups).
-저장소 근거: [데모 runbook](docs/demo-runbook.md), [지속 검증](artifacts/loadtest/continuous-verification.json),
-[기본 streaming/Workbook/KQL 검증](artifacts/azure-verification.json).
+저장소 근거: [데모 runbook](docs/demo-runbook.md), 지속 검증(`artifacts/loadtest/continuous-verification.json`),
+기본 streaming/Workbook/KQL 검증(`artifacts/azure-verification.json`).
 
 ## 증거와 적용 전 체크리스트
 

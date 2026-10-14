@@ -16,6 +16,7 @@ from __future__ import annotations
 import posixpath
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -55,7 +56,33 @@ def collect_sources(root: Path) -> dict[str, Path]:
     return sources
 
 
-def rewrite_target(target: str, source_rel: str, out_rel: str, root: Path, sources: dict[str, Path]) -> str:
+def repo_files(root: Path) -> set[str] | None:
+    """Files a clean checkout would contain: tracked plus untracked-but-not-ignored.
+
+    Returns None outside a git repository so callers fall back to the filesystem.
+    A link to a git-ignored local file (for example artifacts/) works on a
+    developer machine but is broken on GitHub and in CI, so it must not pass.
+    """
+    if not (root / ".git").exists():
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            cwd=root, capture_output=True, check=True)
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return {name for name in result.stdout.decode("utf-8").split("\0") if name}
+
+
+def exists_in_checkout(rel: str, resolved: Path, tracked: set[str] | None) -> tuple[bool, bool]:
+    """Return (is_file, is_dir) as a clean checkout would see them."""
+    if tracked is None:
+        return resolved.is_file(), resolved.is_dir()
+    return rel in tracked, any(name.startswith(f"{rel}/") for name in tracked)
+
+
+def rewrite_target(target: str, source_rel: str, out_rel: str, root: Path, sources: dict[str, Path],
+                   tracked: set[str] | None = None) -> str:
     wrapped = target.startswith("<") and target.endswith(">")
     raw = target[1:-1] if wrapped else target
     if raw.startswith(("http://", "https://", "mailto:", "#")) or "://" in raw:
@@ -68,11 +95,12 @@ def rewrite_target(target: str, source_rel: str, out_rel: str, root: Path, sourc
         rel = resolved.relative_to(root.resolve()).as_posix()
     except ValueError as error:
         raise SiteError(f"{source_rel}: link leaves the repository: {raw}") from error
+    is_file, is_dir = exists_in_checkout(rel, resolved, tracked)
     if rel in sources:
         link = posixpath.relpath(site_path(rel), posixpath.dirname(out_rel) or ".")
-    elif resolved.is_dir():
+    elif is_dir:
         link = f"{REPO_URL}/tree/{BRANCH}/{rel}"
-    elif resolved.is_file():
+    elif is_file:
         link = f"{REPO_URL}/blob/{BRANCH}/{rel}"
     else:
         raise SiteError(f"{source_rel}: broken link: {raw}")
@@ -148,7 +176,7 @@ def promote_headings(lines: list[str]) -> list[str]:
 
 
 def render_page(lines: list[str], source_rel: str, out_rel: str, root: Path, sources: dict[str, Path],
-                front: str, title: str | None) -> str:
+                front: str, title: str | None, tracked: set[str] | None = None) -> str:
     result: list[str] = []
     in_fence = False
     has_h1 = False
@@ -159,7 +187,8 @@ def render_page(lines: list[str], source_rel: str, out_rel: str, root: Path, sou
             if line.startswith("# "):
                 has_h1 = True
             line = LINK.sub(
-                lambda m: f"{m.group(1)}{rewrite_target(m.group(2), source_rel, out_rel, root, sources)}{m.group(3)}", line)
+                lambda m: f"{m.group(1)}{rewrite_target(m.group(2), source_rel, out_rel, root, sources, tracked)}{m.group(3)}",
+                line)
         result.append(line)
     body = "\n".join(result).strip("\n")
     if title and not has_h1:
@@ -167,7 +196,8 @@ def render_page(lines: list[str], source_rel: str, out_rel: str, root: Path, sou
     return f"{front}\n{body}\n" if front else f"{body}\n"
 
 
-def transform(text: str, source_rel: str, root: Path, sources: dict[str, Path]) -> dict[str, str]:
+def transform(text: str, source_rel: str, root: Path, sources: dict[str, Path],
+              tracked: set[str] | None = None) -> dict[str, str]:
     """Return ``{site path: markdown}`` for one source file."""
     text = text.replace("\r\n", "\n")
     match = FRONT_MATTER.match(text)
@@ -183,11 +213,11 @@ def transform(text: str, source_rel: str, root: Path, sources: dict[str, Path]) 
     pages: dict[str, str] = {}
     for index, (out_rel, page_title, page_lines) in enumerate(split_pages(lines, default_out, source_rel)):
         if index == 0:
-            pages[out_rel] = render_page(page_lines, source_rel, out_rel, root, sources, front, title)
+            pages[out_rel] = render_page(page_lines, source_rel, out_rel, root, sources, front, title, tracked)
         elif page_title:
-            pages[out_rel] = render_page(page_lines, source_rel, out_rel, root, sources, "", page_title)
+            pages[out_rel] = render_page(page_lines, source_rel, out_rel, root, sources, "", page_title, tracked)
         else:
-            pages[out_rel] = render_page(promote_headings(page_lines), source_rel, out_rel, root, sources, "", None)
+            pages[out_rel] = render_page(promote_headings(page_lines), source_rel, out_rel, root, sources, "", None, tracked)
     return pages
 
 
@@ -198,10 +228,11 @@ def prepare(root: Path, out: Path) -> list[str]:
     sources = collect_sources(root)
     if "README.md" not in sources:
         raise SiteError("README.md is required as the site home page.")
+    tracked = repo_files(root)
     written: set[str] = set()
     for rel, path in sources.items():
         if rel.endswith(".md"):
-            for out_rel, markdown in transform(path.read_text(encoding="utf-8"), rel, root, sources).items():
+            for out_rel, markdown in transform(path.read_text(encoding="utf-8"), rel, root, sources, tracked).items():
                 if out_rel in written:
                     raise SiteError(f"{rel}: site page already produced by another source: {out_rel}")
                 target = out / out_rel

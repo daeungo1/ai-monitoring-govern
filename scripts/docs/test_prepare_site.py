@@ -197,6 +197,40 @@ def test_duplicate_or_unsafe_site_page_markers_fail_the_build(tmp_path):
         build(tmp_path / "esc", {**SPLIT_FILES, "README.md": escaping})
 
 
+def test_links_to_git_ignored_files_fail_like_they_do_in_a_clean_checkout(tmp_path):
+    import shutil
+    import subprocess
+    if shutil.which("git") is None:
+        pytest.skip("git is required")
+    root = make_repo(tmp_path, {
+        **BASE,
+        "README.md": "---\ntitle: 홈\n---\n\n[로컬 증거](artifacts/result.json)\n",
+        ".gitignore": "artifacts/\n",
+        "artifacts/result.json": "{}",
+    })
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    with pytest.raises(ps.SiteError) as error:
+        ps.prepare(root, root / ".site-src")
+    assert "artifacts/result.json" in str(error.value)
+
+
+def test_untracked_but_not_ignored_files_are_still_linkable(tmp_path):
+    import shutil
+    import subprocess
+    if shutil.which("git") is None:
+        pytest.skip("git is required")
+    root = make_repo(tmp_path, {
+        **BASE,
+        "README.md": "---\ntitle: 홈\n---\n\n[새 파일](config/new.json) [폴더](config)\n",
+        "config/new.json": "{}",
+    })
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    out = root / ".site-src"
+    ps.prepare(root, out)
+    text = (out / "index.md").read_text(encoding="utf-8")
+    assert f"{REPO}/blob/main/config/new.json" in text and f"{REPO}/tree/main/config" in text
+
+
 def test_every_prepared_page_is_reachable_from_the_real_navigation(tmp_path):
     repo = Path(__file__).resolve().parents[2]
     text = (repo / "mkdocs.yml").read_text(encoding="utf-8")
