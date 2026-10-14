@@ -7,7 +7,7 @@ ms.date: 2026-10-15
 ## 한눈에 보기
 
 <!-- 문서 사이트(GitHub Pages)에서는 site-page 주석 마커를 기준으로 이 README를 탭별 페이지로 나눕니다. 규칙은 scripts/docs/prepare_site.py 참고. GitHub에서는 이 파일 하나로 읽힙니다. -->
-<!-- site-link -->📖 **문서 사이트로 보기:** [Azure OpenAI 모니터링 가이드](https://daeungo1.github.io/ai-monitoring-govern/) — 검색과 탐색 메뉴가 있는 웹 문서입니다. 비슷한 형식의 다른 문서: [Azure Engineering Notes](https://daeungo1.github.io/devguidesample/)
+<!-- site-link -->📖 **문서 사이트로 보기:** [Azure OpenAI 모니터링 가이드](https://daeungo1.github.io/ai-monitoring-govern/) — 검색과 탐색 메뉴가 있는 웹 문서입니다. 
 
 Azure OpenAI를 API로 직접 호출(에이전트 기능 없이)하는 팀 가이드: 실제 Azure 환경에서 검증한 데모입니다.
 
