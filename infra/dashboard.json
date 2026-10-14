@@ -1,0 +1,251 @@
+{
+  "lenses": [
+    {
+      "order": 0,
+      "parts": [
+        {
+          "position": {
+            "x": 0,
+            "y": 0,
+            "colSpan": 12,
+            "rowSpan": 2
+          },
+          "metadata": {
+            "type": "Extension/HubsExtension/PartType/MarkdownPart",
+            "inputs": [],
+            "settings": {
+              "content": {
+                "settings": {
+                  "title": "AI Observability · Azure Native",
+                  "content": "## Streaming API Operations\n**No AKS / No local app required** · Entra/RBAC · Azure Monitor Metrics / Log Analytics\n\n[상세 Workbook: 모델·기간·live/fixture·비용·가드레일](https://portal.azure.com/#@/resource__WORKBOOK_RESOURCE_ID__/workbook)",
+                  "markdownUri": null
+                }
+              }
+            }
+          }
+        },
+        {
+          "position": {
+            "x": 0,
+            "y": 2,
+            "colSpan": 6,
+            "rowSpan": 4
+          },
+          "metadata": {
+            "type": "Extension/Microsoft_Azure_Monitoring/PartType/MetricsChartPart",
+            "inputs": [
+              {
+                "name": "queryInputs",
+                "value": {
+                  "timespan": {
+                    "duration": "PT24H"
+                  },
+                  "id": "__OPENAI_RESOURCE_ID__",
+                  "chartType": 0,
+                  "metrics": [
+                    {
+                      "name": "AzureOpenAIRequests",
+                      "resourceId": "__OPENAI_RESOURCE_ID__",
+                      "namespace": "Microsoft.CognitiveServices/accounts",
+                      "aggregationType": 1
+                    }
+                  ]
+                }
+              }
+            ],
+            "settings": {
+              "content": {
+                "options": {
+                  "chart": {
+                    "title": "Azure OpenAI Requests"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "position": {
+            "x": 6,
+            "y": 2,
+            "colSpan": 6,
+            "rowSpan": 4
+          },
+          "metadata": {
+            "type": "Extension/Microsoft_Azure_Monitoring/PartType/MetricsChartPart",
+            "inputs": [
+              {
+                "name": "queryInputs",
+                "value": {
+                  "timespan": {
+                    "duration": "PT24H"
+                  },
+                  "id": "__OPENAI_RESOURCE_ID__",
+                  "chartType": 0,
+                  "metrics": [
+                    {
+                      "name": "ProcessedPromptTokens",
+                      "resourceId": "__OPENAI_RESOURCE_ID__",
+                      "namespace": "Microsoft.CognitiveServices/accounts",
+                      "aggregationType": 1
+                    },
+                    {
+                      "name": "GeneratedTokens",
+                      "resourceId": "__OPENAI_RESOURCE_ID__",
+                      "namespace": "Microsoft.CognitiveServices/accounts",
+                      "aggregationType": 1
+                    }
+                  ]
+                }
+              }
+            ],
+            "settings": {
+              "content": {
+                "options": {
+                  "chart": {
+                    "title": "Input / Output Tokens"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "position": {
+            "x": 0,
+            "y": 6,
+            "colSpan": 6,
+            "rowSpan": 4
+          },
+          "metadata": {
+            "type": "Extension/Microsoft_Azure_Monitoring/PartType/MetricsChartPart",
+            "inputs": [
+              {
+                "name": "queryInputs",
+                "value": {
+                  "timespan": {
+                    "duration": "PT24H"
+                  },
+                  "id": "__OPENAI_RESOURCE_ID__",
+                  "chartType": 0,
+                  "metrics": [
+                    {
+                      "name": "AzureOpenAITTLTInMS",
+                      "resourceId": "__OPENAI_RESOURCE_ID__",
+                      "namespace": "Microsoft.CognitiveServices/accounts",
+                      "aggregationType": 4
+                    }
+                  ]
+                }
+              }
+            ],
+            "settings": {
+              "content": {
+                "options": {
+                  "chart": {
+                    "title": "Service time to last byte (not client TTFT)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "position": {
+            "x": 6,
+            "y": 6,
+            "colSpan": 6,
+            "rowSpan": 4
+          },
+          "metadata": {
+            "type": "Extension/Microsoft_Azure_Monitoring/PartType/MetricsChartPart",
+            "inputs": [
+              {
+                "name": "queryInputs",
+                "value": {
+                  "timespan": {
+                    "duration": "PT24H"
+                  },
+                  "id": "__OPENAI_RESOURCE_ID__",
+                  "chartType": 0,
+                  "metrics": [
+                    {
+                      "name": "TokenTransaction",
+                      "resourceId": "__OPENAI_RESOURCE_ID__",
+                      "namespace": "Microsoft.CognitiveServices/accounts",
+                      "aggregationType": 1
+                    }
+                  ]
+                }
+              }
+            ],
+            "settings": {
+              "content": {
+                "options": {
+                  "chart": {
+                    "title": "Total inference tokens (do not add to prompt/output)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "position": {
+            "x": 0,
+            "y": 10,
+            "colSpan": 6,
+            "rowSpan": 3
+          },
+          "metadata": {
+            "type": "Extension/HubsExtension/PartType/MarkdownPart",
+            "inputs": [],
+            "settings": {
+              "content": {
+                "settings": {
+                  "title": "価格 / Guardrails",
+                  "content": "* gpt-6-luna: Input $0.1, Cached $0.01, Output $0.5 / 1M\n* gpt-5.6-luna: Input $0.2, Cached $0.02, Output $1.2 / 1M\n* gpt-5.6-terra: Input $2, Cached $0.2, Output $12 / 1M\n\nAzure retail / Global Standard / Short context / USD. Cache writes・Flex・Priority・Long contextは別 meter。\n\n[Azure公式価格](https://azure.microsoft.com/en-us/pricing/details/azure-openai/)",
+                  "markdownUri": null
+                }
+              }
+            }
+          }
+        },
+        {
+          "position": {
+            "x": 6,
+            "y": 10,
+            "colSpan": 6,
+            "rowSpan": 3
+          },
+          "metadata": {
+            "type": "Extension/HubsExtension/PartType/MarkdownPart",
+            "inputs": [],
+            "settings": {
+              "content": {
+                "settings": {
+                  "title": "運用 / Notifications",
+                  "content": "[Workbook 상세 분석](https://portal.azure.com/#@/resource__WORKBOOK_RESOURCE_ID__/workbook)\n\n[Log Analytics](https://portal.azure.com/#@/resource__WORKSPACE_RESOURCE_ID__/logs)\n\n[Action Group](https://portal.azure.com/#@/resource__ACTION_GROUP_ID__/overview)\n\nStreaming TTFT・usage coverage・차단 detail은 Workbook. 테스트 메일과 실제 Fired 이력을 구분.",
+                  "markdownUri": null
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "model": {
+      "timeRange": {
+        "value": {
+          "relative": {
+            "duration": 24,
+            "timeUnit": 1
+          }
+        },
+        "type": "MsPortalFx.Composition.Configuration.ValueTypes.TimeRange"
+      }
+    }
+  }
+}

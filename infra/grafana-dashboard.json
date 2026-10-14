@@ -1,0 +1,800 @@
+{
+  "uid": "aoai-streaming-hybrid",
+  "title": "AI Observability · Streaming Hybrid",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": [
+    "azure-openai",
+    "streaming",
+    "governance",
+    "no-aks"
+  ],
+  "timezone": "browser",
+  "refresh": "1m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "deployment",
+        "type": "custom",
+        "query": "all,gpt-6-luna,gpt-5.6-luna,gpt-5.6-terra",
+        "multi": false,
+        "options": [
+          {
+            "text": "all",
+            "value": "all",
+            "selected": true
+          },
+          {
+            "text": "gpt-6-luna",
+            "value": "gpt-6-luna",
+            "selected": false
+          },
+          {
+            "text": "gpt-5.6-luna",
+            "value": "gpt-5.6-luna",
+            "selected": false
+          },
+          {
+            "text": "gpt-5.6-terra",
+            "value": "gpt-5.6-terra",
+            "selected": false
+          }
+        ],
+        "current": {
+          "text": "all",
+          "value": "all"
+        },
+        "includeAll": false
+      },
+      {
+        "name": "mode",
+        "type": "custom",
+        "query": "live,fixture",
+        "multi": false,
+        "options": [
+          {
+            "text": "live",
+            "value": "live",
+            "selected": true
+          },
+          {
+            "text": "fixture",
+            "value": "fixture",
+            "selected": false
+          }
+        ],
+        "current": {
+          "text": "live",
+          "value": "live"
+        },
+        "includeAll": false
+      }
+    ]
+  },
+  "links": [
+    {
+      "title": "Azure Workbook",
+      "url": "https://portal.azure.com/#@/resource/subscriptions/2cf925b6-80cb-4567-abda-5ccd3010aab5/resourceGroups/rg-aoai-monitor-demo-20261014/providers/Microsoft.Insights/workbooks/26f11243-a304-50b5-8797-f3b95ce52949/workbook",
+      "type": "link",
+      "targetBlank": true
+    },
+    {
+      "title": "Azure pricing",
+      "url": "https://azure.microsoft.com/en-us/pricing/details/azure-openai/",
+      "type": "link",
+      "targetBlank": true
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "요청·사용량·비용 KPI",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "aoai-azure-monitor"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Log Analytics",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "aoai-azure-monitor"
+          },
+          "azureLogAnalytics": {
+            "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic(\"\"));\nAppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"${mode:raw}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"${deployment:raw}\" == \"all\" or Deployment == \"${deployment:raw}\"\n| where \"all\" == \"all\" or Model == \"all\"\n| where \"all\" == \"all\" or tostring(Streaming) == \"all\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Attempts=count(), Successes=countif(Outcome==\"success\"), InputTokens=sum(Prompt), OutputTokens=sum(Completion),\n  KnownUsage=countif(Known), PricedAttempts=countif(isnotnull(EstimatedUsd)), EstimatedUsd=sum(EstimatedUsd)\n| extend EstimatedUsd=iff(PricedAttempts==0,real(null),EstimatedUsd), UsageCoveragePct=iff(Attempts==0,real(null),100.0*KnownUsage/Attempts)",
+            "resources": [
+              "/subscriptions/2cf925b6-80cb-4567-abda-5ccd3010aab5/resourceGroups/rg-aoai-monitor-demo-20261014/providers/Microsoft.OperationalInsights/workspaces/aoaimon20261014d-law"
+            ],
+            "resultFormat": "table"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 2,
+      "title": "요청 추이 · 5분",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "aoai-azure-monitor"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Log Analytics",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "aoai-azure-monitor"
+          },
+          "azureLogAnalytics": {
+            "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic(\"\"));\nAppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"${mode:raw}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"${deployment:raw}\" == \"all\" or Deployment == \"${deployment:raw}\"\n| where \"all\" == \"all\" or Model == \"all\"\n| where \"all\" == \"all\" or tostring(Streaming) == \"all\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Attempts=count() by Time=bin(TimeGenerated,5m), Deployment\n| order by Time asc",
+            "resources": [
+              "/subscriptions/2cf925b6-80cb-4567-abda-5ccd3010aab5/resourceGroups/rg-aoai-monitor-demo-20261014/providers/Microsoft.OperationalInsights/workspaces/aoaimon20261014d-law"
+            ],
+            "resultFormat": "time_series"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "모델별 운영 비교",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "aoai-azure-monitor"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Log Analytics",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "aoai-azure-monitor"
+          },
+          "azureLogAnalytics": {
+            "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic(\"\"));\nAppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"${mode:raw}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"${deployment:raw}\" == \"all\" or Deployment == \"${deployment:raw}\"\n| where \"all\" == \"all\" or Model == \"all\"\n| where \"all\" == \"all\" or tostring(Streaming) == \"all\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Attempts=count(), Success=countif(Outcome==\"success\"), Errors=countif(Status>=500 or Outcome==\"network_error\"),\n  Throttled=countif(Status==429), InputBlocks=countif(Outcome==\"input_blocked\"), OutputBlocks=countif(Outcome==\"output_blocked\"),\n  P50DurationMs=percentile(DurationMs,50), P90DurationMs=percentile(DurationMs,90), P95DurationMs=percentile(DurationMs,95), P99DurationMs=percentile(DurationMs,99),\n  UsageKnown=countif(Known), FilterAnnotated=countif(Annotated) by Deployment\n| extend SuccessPct=100.0*Success/Attempts, UsageCoveragePct=100.0*UsageKnown/Attempts, AnnotationCoveragePct=100.0*FilterAnnotated/Attempts",
+            "resources": [
+              "/subscriptions/2cf925b6-80cb-4567-abda-5ccd3010aab5/resourceGroups/rg-aoai-monitor-demo-20261014/providers/Microsoft.OperationalInsights/workspaces/aoaimon20261014d-law"
+            ],
+            "resultFormat": "table"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 4,
+      "title": "Input / Output / Cached token 추이",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "aoai-azure-monitor"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Log Analytics",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "aoai-azure-monitor"
+          },
+          "azureLogAnalytics": {
+            "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic(\"\"));\nAppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"${mode:raw}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"${deployment:raw}\" == \"all\" or Deployment == \"${deployment:raw}\"\n| where \"all\" == \"all\" or Model == \"all\"\n| where \"all\" == \"all\" or tostring(Streaming) == \"all\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Input=sum(Prompt), Output=sum(Completion), CachedInput=sum(Cached) by Time=bin(TimeGenerated,5m)\n| order by Time asc",
+            "resources": [
+              "/subscriptions/2cf925b6-80cb-4567-abda-5ccd3010aab5/resourceGroups/rg-aoai-monitor-demo-20261014/providers/Microsoft.OperationalInsights/workspaces/aoaimon20261014d-law"
+            ],
+            "resultFormat": "time_series"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Tokenomics · 요청당 사용량/캐시 비율",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "aoai-azure-monitor"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Log Analytics",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "aoai-azure-monitor"
+          },
+          "azureLogAnalytics": {
+            "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic(\"\"));\nAppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"${mode:raw}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"${deployment:raw}\" == \"all\" or Deployment == \"${deployment:raw}\"\n| where \"all\" == \"all\" or Model == \"all\"\n| where \"all\" == \"all\" or tostring(Streaming) == \"all\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Requests=count(), KnownUsage=countif(Known), PromptTokens=sum(Prompt), CompletionTokens=sum(Completion), CachedTokens=sum(Cached) by Deployment\n| extend PromptTokensPerKnownRequest=iff(KnownUsage==0,real(null),1.0*PromptTokens/KnownUsage), OutputTokensPerKnownRequest=iff(KnownUsage==0,real(null),1.0*CompletionTokens/KnownUsage), CachePct=iff(PromptTokens==0,real(null),100.0*CachedTokens/PromptTokens)",
+            "resources": [
+              "/subscriptions/2cf925b6-80cb-4567-abda-5ccd3010aab5/resourceGroups/rg-aoai-monitor-demo-20261014/providers/Microsoft.OperationalInsights/workspaces/aoaimon20261014d-law"
+            ],
+            "resultFormat": "table"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 6,
+      "title": "TTFT·종료·취소·final usage",
+      "type": "table",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "aoai-azure-monitor"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Log Analytics",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "aoai-azure-monitor"
+          },
+          "azureLogAnalytics": {
+            "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic(\"\"));\nAppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"${mode:raw}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"${deployment:raw}\" == \"all\" or Deployment == \"${deployment:raw}\"\n| where \"all\" == \"all\" or Model == \"all\"\n| where \"all\" == \"all\" or tostring(Streaming) == \"all\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| where Streaming\n| summarize Streams=count(), Completed=countif(Completed), Cancelled=countif(Outcome==\"stream_cancelled\"),\n  Incomplete=countif(Outcome==\"stream_incomplete\"), KnownUsage=countif(Known), TTFTObserved=countif(isnotnull(TTFT)),\n  TTFTP50Ms=percentile(TTFT,50), TTFTP95Ms=percentile(TTFT,95), DurationP95Ms=percentile(DurationMs,95),\n  InterChunkMeanMs=avg(Gap) by Deployment\n| extend FinalUsageCoveragePct=100.0*KnownUsage/Streams",
+            "resources": [
+              "/subscriptions/2cf925b6-80cb-4567-abda-5ccd3010aab5/resourceGroups/rg-aoai-monitor-demo-20261014/providers/Microsoft.OperationalInsights/workspaces/aoaimon20261014d-law"
+            ],
+            "resultFormat": "table"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 7,
+      "title": "Streaming TTFT p95 / p99 · 모델별",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "aoai-azure-monitor"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Log Analytics",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "aoai-azure-monitor"
+          },
+          "azureLogAnalytics": {
+            "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic(\"\"));\nAppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"${mode:raw}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"${deployment:raw}\" == \"all\" or Deployment == \"${deployment:raw}\"\n| where \"all\" == \"all\" or Model == \"all\"\n| where \"all\" == \"all\" or tostring(Streaming) == \"all\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| where Streaming and isnotnull(TTFT)\n| summarize TTFTP95Ms=percentile(TTFT,95), TTFTP99Ms=percentile(TTFT,99) by Time=bin(TimeGenerated,5m), Deployment\n| order by Time asc",
+            "resources": [
+              "/subscriptions/2cf925b6-80cb-4567-abda-5ccd3010aab5/resourceGroups/rg-aoai-monitor-demo-20261014/providers/Microsoft.OperationalInsights/workspaces/aoaimon20261014d-law"
+            ],
+            "resultFormat": "time_series"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "HTTP 400/429/5xx · error / throttle rate",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "aoai-azure-monitor"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Log Analytics",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "aoai-azure-monitor"
+          },
+          "azureLogAnalytics": {
+            "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic(\"\"));\nAppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"${mode:raw}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"${deployment:raw}\" == \"all\" or Deployment == \"${deployment:raw}\"\n| where \"all\" == \"all\" or Model == \"all\"\n| where \"all\" == \"all\" or tostring(Streaming) == \"all\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Attempts=count(), HTTP400=countif(Status==400), HTTP429=countif(Status==429), HTTP5xx=countif(Status>=500), NetworkErrors=countif(Outcome==\"network_error\") by Time=bin(TimeGenerated,5m), Deployment\n| extend ThrottlePct=100.0*HTTP429/Attempts, ErrorPct=100.0*(HTTP5xx+NetworkErrors)/Attempts",
+            "resources": [
+              "/subscriptions/2cf925b6-80cb-4567-abda-5ccd3010aab5/resourceGroups/rg-aoai-monitor-demo-20261014/providers/Microsoft.OperationalInsights/workspaces/aoaimon20261014d-law"
+            ],
+            "resultFormat": "time_series"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "모델별 token → USD",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "aoai-azure-monitor"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Log Analytics",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "aoai-azure-monitor"
+          },
+          "azureLogAnalytics": {
+            "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic(\"\"));\nAppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"${mode:raw}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"${deployment:raw}\" == \"all\" or Deployment == \"${deployment:raw}\"\n| where \"all\" == \"all\" or Model == \"all\"\n| where \"all\" == \"all\" or tostring(Streaming) == \"all\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Attempts=count(), KnownUsage=countif(Known), PricedAttempts=countif(isnotnull(EstimatedUsd)),\n  PromptTokens=sum(Prompt), CachedTokens=sum(Cached), CompletionTokens=sum(Completion), EstimatedUsd=sum(EstimatedUsd),\n  RecordedCostUsd=sum(RecordedCost), SnapshotRepriceUsd=sum(iff(isnull(RecordedCost),RetailRepriced,real(null))) by Deployment\n| extend EstimatedUsd=iff(PricedAttempts==0,real(null),EstimatedUsd), PriceCoveragePct=100.0*PricedAttempts/Attempts",
+            "resources": [
+              "/subscriptions/2cf925b6-80cb-4567-abda-5ccd3010aab5/resourceGroups/rg-aoai-monitor-demo-20261014/providers/Microsoft.OperationalInsights/workspaces/aoaimon20261014d-law"
+            ],
+            "resultFormat": "table"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 10,
+      "title": "추정 비용 USD · 청구 아님",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "aoai-azure-monitor"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Log Analytics",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "aoai-azure-monitor"
+          },
+          "azureLogAnalytics": {
+            "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic(\"\"));\nAppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"${mode:raw}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"${deployment:raw}\" == \"all\" or Deployment == \"${deployment:raw}\"\n| where \"all\" == \"all\" or Model == \"all\"\n| where \"all\" == \"all\" or tostring(Streaming) == \"all\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| where isnotnull(EstimatedUsd)\n| summarize EstimatedUsd=sum(EstimatedUsd) by Time=bin(TimeGenerated,5m), Deployment\n| order by Time asc",
+            "resources": [
+              "/subscriptions/2cf925b6-80cb-4567-abda-5ccd3010aab5/resourceGroups/rg-aoai-monitor-demo-20261014/providers/Microsoft.OperationalInsights/workspaces/aoaimon20261014d-law"
+            ],
+            "resultFormat": "time_series"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "필터 category / source / severity",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "aoai-azure-monitor"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Log Analytics",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "aoai-azure-monitor"
+          },
+          "azureLogAnalytics": {
+            "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic(\"\"));\nAppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"${mode:raw}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"${deployment:raw}\" == \"all\" or Deployment == \"${deployment:raw}\"\n| where \"all\" == \"all\" or Model == \"all\"\n| where \"all\" == \"all\" or tostring(Streaming) == \"all\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| mv-expand Filter=parse_json(tostring(Properties[\"aoai.filters\"]))\n| summarize Observations=count(), Blocks=countif(tobool(Filter.filtered)) by Source=tostring(Filter.source), Category=tostring(Filter.category), Severity=tostring(Filter.severity)",
+            "resources": [
+              "/subscriptions/2cf925b6-80cb-4567-abda-5ccd3010aab5/resourceGroups/rg-aoai-monitor-demo-20261014/providers/Microsoft.OperationalInsights/workspaces/aoaimon20261014d-law"
+            ],
+            "resultFormat": "table"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 12,
+      "title": "차단·filter service failure 요청",
+      "type": "table",
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "aoai-azure-monitor"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Log Analytics",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "aoai-azure-monitor"
+          },
+          "azureLogAnalytics": {
+            "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic(\"\"));\nAppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"${mode:raw}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"${deployment:raw}\" == \"all\" or Deployment == \"${deployment:raw}\"\n| where \"all\" == \"all\" or Model == \"all\"\n| where \"all\" == \"all\" or tostring(Streaming) == \"all\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| where Outcome in (\"input_blocked\",\"output_blocked\",\"filter_unavailable\")\n| project TimeGenerated, Deployment, Outcome, Status, RunId, OperationId, Annotated, UsageKnown=Known\n| order by TimeGenerated desc\n| take 100",
+            "resources": [
+              "/subscriptions/2cf925b6-80cb-4567-abda-5ccd3010aab5/resourceGroups/rg-aoai-monitor-demo-20261014/providers/Microsoft.OperationalInsights/workspaces/aoaimon20261014d-law"
+            ],
+            "resultFormat": "table"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 13,
+      "title": "Usage / pricing / annotation coverage",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "aoai-azure-monitor"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Log Analytics",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "aoai-azure-monitor"
+          },
+          "azureLogAnalytics": {
+            "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic(\"\"));\nAppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"${mode:raw}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"${deployment:raw}\" == \"all\" or Deployment == \"${deployment:raw}\"\n| where \"all\" == \"all\" or Model == \"all\"\n| where \"all\" == \"all\" or tostring(Streaming) == \"all\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Attempts=count(), UsageKnown=countif(Known), Priced=countif(isnotnull(EstimatedUsd)), Annotations=countif(Annotated) by Deployment\n| extend UnknownUsage=Attempts-UsageKnown, Unpriced=Attempts-Priced, MissingAnnotations=Attempts-Annotations",
+            "resources": [
+              "/subscriptions/2cf925b6-80cb-4567-abda-5ccd3010aab5/resourceGroups/rg-aoai-monitor-demo-20261014/providers/Microsoft.OperationalInsights/workspaces/aoaimon20261014d-law"
+            ],
+            "resultFormat": "table"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 14,
+      "title": "최근 요청 100개 · recorded vs repriced cost",
+      "type": "table",
+      "gridPos": {
+        "x": 12,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "aoai-azure-monitor"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Log Analytics",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "aoai-azure-monitor"
+          },
+          "azureLogAnalytics": {
+            "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic(\"\"));\nAppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"${mode:raw}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"${deployment:raw}\" == \"all\" or Deployment == \"${deployment:raw}\"\n| where \"all\" == \"all\" or Model == \"all\"\n| where \"all\" == \"all\" or tostring(Streaming) == \"all\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| project TimeGenerated, Deployment, Outcome, Status, TTFT, DurationMs, Streaming, Completed, Prompt, Completion, Cached, EstimatedUsd, RecordedCost, PriceBasis, RunId, OperationId\n| order by TimeGenerated desc\n| take 100",
+            "resources": [
+              "/subscriptions/2cf925b6-80cb-4567-abda-5ccd3010aab5/resourceGroups/rg-aoai-monitor-demo-20261014/providers/Microsoft.OperationalInsights/workspaces/aoaimon20261014d-law"
+            ],
+            "resultFormat": "table"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 15,
+      "title": "수집 지연 / 마지막 관측",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "aoai-azure-monitor"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Log Analytics",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "aoai-azure-monitor"
+          },
+          "azureLogAnalytics": {
+            "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic(\"\"));\nAppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"${mode:raw}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"${deployment:raw}\" == \"all\" or Deployment == \"${deployment:raw}\"\n| where \"all\" == \"all\" or Model == \"all\"\n| where \"all\" == \"all\" or tostring(Streaming) == \"all\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| extend LagSeconds=(ingestion_time()-TimeGenerated)/1s\n| summarize Attempts=count(), IngestionP95Seconds=percentile(LagSeconds,95), LastEvent=max(TimeGenerated) by Deployment",
+            "resources": [
+              "/subscriptions/2cf925b6-80cb-4567-abda-5ccd3010aab5/resourceGroups/rg-aoai-monitor-demo-20261014/providers/Microsoft.OperationalInsights/workspaces/aoaimon20261014d-law"
+            ],
+            "resultFormat": "table"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    }
+  ],
+  "description": "Actual Azure Monitor LAW data. No agents or AKS. Fixture is not incident/billing. Retail reprice is separate from recorded ledger/invoice. PTU/spillover N/A for PAYG. Chunk gap is not token TBT."
+}

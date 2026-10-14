@@ -1,0 +1,4 @@
+AzureDiagnostics
+| where TimeGenerated > ago(24h)
+| where ResourceProvider == "MICROSOFT.COGNITIVESERVICES"
+| summarize Records=count() by Category, OperationName

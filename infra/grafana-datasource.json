@@ -1,0 +1,11 @@
+{
+  "uid": "aoai-azure-monitor",
+  "name": "AOAI Azure Monitor",
+  "type": "grafana-azure-monitor-datasource",
+  "access": "proxy",
+  "jsonData": {
+    "azureAuthType": "msi",
+    "cloudName": "azuremonitor",
+    "subscriptionId": "2cf925b6-80cb-4567-abda-5ccd3010aab5"
+  }
+}

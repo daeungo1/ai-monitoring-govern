@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 800" role="img" aria-labelledby="title desc">
+  <title id="title">AI Observability 표준 아키텍처와 Governance</title>
+  <desc id="desc">AKS 없이 streaming API, Azure OpenAI, OpenTelemetry, Application Insights, Log Analytics, Azure Monitor, Dashboard와 이메일 경고를 연결한다. Governance가 모든 계층을 통제한다.</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8Z" fill="#3573a5"/></marker></defs>
+  <rect width="1240" height="800" fill="#f7f9fc"/>
+  <g font-family="Segoe UI, sans-serif" fill="#203247">
+    <text x="40" y="46" font-size="25" font-weight="700">AI Observability · Standard Architecture</text>
+    <text x="40" y="75" font-size="15" fill="#5f6e7d">Streaming API / Azure Monitor / Governance · 현재 구성에 AKS 없음</text>
+    <rect x="40" y="98" width="1160" height="64" rx="12" fill="#e7eef8" stroke="#96b7d9"/>
+    <text x="60" y="123" font-size="17" font-weight="700">GOVERNANCE CONTROL PLANE</text>
+    <text x="60" y="146" font-size="14">모델·버전 승인  |  Entra / RBAC  |  Data minimization  |  가격 provenance  |  Safety policy  |  SLO·변경·incident 절차</text>
+    <rect x="40" y="200" width="250" height="130" rx="14" fill="#ffffff" stroke="#96b7d9"/>
+    <text x="60" y="233" font-size="18" font-weight="700">Application / API Caller</text>
+    <text x="60" y="262" font-size="14">Local demo → customer app</text><text x="60" y="286" font-size="14">Entra token / stream=true</text>
+    <text x="60" y="310" font-size="14">TTFT · usage · outcome capture</text>
+    <rect x="380" y="200" width="380" height="130" rx="14" fill="#eaf4ff" stroke="#3573a5"/>
+    <text x="400" y="233" font-size="18" font-weight="700">Azure OpenAI + RAI Policy</text>
+    <text x="400" y="262" font-size="14">gpt-6-luna / gpt-5.6-luna / gpt-5.6-terra</text>
+    <text x="400" y="286" font-size="14">Explicit versions · GlobalStandard · PAYG</text>
+    <text x="400" y="310" font-size="14">Medium input/output filters · no API keys</text>
+    <rect x="860" y="200" width="340" height="130" rx="14" fill="#ffffff" stroke="#96b7d9"/>
+    <text x="880" y="233" font-size="18" font-weight="700">Azure Monitor Native Metrics</text>
+    <text x="880" y="262" font-size="14">Requests / prompt / completion tokens</text>
+    <text x="880" y="286" font-size="14">Latency / safety metrics: SKU 확인</text>
+    <text x="880" y="310" font-size="14">Diagnostic export ≠ billing authority</text>
+    <g stroke="#3573a5" stroke-width="2" fill="none" marker-end="url(#arrow)">
+      <path d="M290 252H380"/><path d="M760 252H860"/>
+      <path d="M165 330V420"/><path d="M570 330V420"/><path d="M1030 330V405H825V550H860"/>
+      <path d="M300 476H435"/><path d="M700 570H860"/>
+    </g>
+    <text x="301" y="242" font-size="12">HTTPS / SSE</text><text x="777" y="242" font-size="12">자동 수집</text>
+    <text x="176" y="379" font-size="13">sanitized OTel spans</text><text x="580" y="379" font-size="13">Audit + AllMetrics</text>
+    <rect x="40" y="420" width="260" height="120" rx="14" fill="#ffffff" stroke="#96b7d9"/>
+    <text x="60" y="452" font-size="18" font-weight="700">Application Insights</text>
+    <text x="60" y="480" font-size="14">Workspace-based APM</text><text x="60" y="505" font-size="14">Allowlist · no prompt / completion</text>
+    <rect x="435" y="420" width="265" height="215" rx="14" fill="#eaf4ff" stroke="#3573a5"/>
+    <text x="455" y="452" font-size="18" font-weight="700">Log Analytics</text>
+    <text x="455" y="480" font-size="14">AppDependencies · Properties</text>
+    <text x="455" y="507" font-size="14">Native exported metrics / Audit</text>
+    <text x="455" y="534" font-size="14">Live / fixture separation</text>
+    <text x="455" y="561" font-size="14">Unknown usage / cost → null</text>
+    <text x="455" y="588" font-size="14">Retention · cap · freshness</text>
+    <text x="455" y="615" font-size="14">Run UUID / evidence queries</text>
+    <rect x="860" y="470" width="340" height="165" rx="14" fill="#fff3f6" stroke="#b11f4b"/>
+    <text x="880" y="502" font-size="18" font-weight="700">Dashboards &amp; Alerting</text>
+    <text x="880" y="530" font-size="14">Portal shared Dashboard / Workbook</text>
+    <text x="880" y="556" font-size="14">Managed Grafana + Reference UI integration</text>
+    <text x="880" y="582" font-size="14">Log + metric rules → Action Group</text>
+    <text x="880" y="608" font-size="14">Email test / receiver / Fired 구분</text>
+    <rect x="40" y="674" width="1160" height="82" rx="12" fill="#ffffff" stroke="#bcc9d5" stroke-dasharray="6 4"/>
+    <text x="60" y="704" font-size="16" font-weight="700">PRODUCTION EXTENSIONS · 별도 승인 / 기본 데모에 배포하지 않음</text>
+    <text x="60" y="732" font-size="14">Managed Identity + private networking  |  Optional APIM AI Gateway  |  Cost Management 일별 대사  |  Safety 평가 코호트</text>
+  </g>
+</svg>

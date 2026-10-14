@@ -1,0 +1,18 @@
+AppDependencies
+| where TimeGenerated > ago(24h)
+| where Properties["telemetry.kind"] == "aoai.request" and Properties["demo.mode"] == "live"
+| extend Deployment=tostring(Properties["aoai.deployment"]),
+    Model=tostring(Properties["gen_ai.request.model"]),
+    Outcome=tostring(Properties["aoai.outcome"]), Status=toint(Properties["aoai.status_code"]),
+    PromptTokens=tolong(Properties["aoai.prompt_tokens"]), CompletionTokens=tolong(Properties["aoai.completion_tokens"]),
+    CachedTokens=tolong(Properties["aoai.cached_tokens"]), Cost=todouble(Properties["aoai.estimated_cost_usd"]),
+    UsageKnown=tobool(Properties["aoai.usage_known"])
+| summarize Attempts=count(), Errors=countif(Status >= 500 or Outcome == "network_error"),
+    Throttled=countif(Status == 429), InputBlocks=countif(Outcome == "input_blocked"),
+    OutputBlocks=countif(Outcome == "output_blocked"), FilterFailures=countif(Outcome == "filter_unavailable"),
+    UnknownUsage=countif(UsageKnown == false), PricedAttempts=countif(isnotnull(Cost)),
+    PromptTokens=sum(PromptTokens), CompletionTokens=sum(CompletionTokens), CachedTokens=sum(CachedTokens),
+    EstimatedUsd=sum(Cost), P50Ms=percentile(DurationMs,50), P95Ms=percentile(DurationMs,95)
+    by Deployment, Model
+| extend EstimatedUsd=iff(PricedAttempts == 0, real(null), EstimatedUsd),
+    ErrorRatePct=100.0*Errors/Attempts, ThrottleRatePct=100.0*Throttled/Attempts

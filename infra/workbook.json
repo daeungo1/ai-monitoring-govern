@@ -1,0 +1,527 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "# Azure OpenAI · Native Operations\nAzure Monitor Workbook · Streaming API · No AKS / No local dashboard\n\n기간·모델·live/fixture·Run UUID로 조회합니다. 비용은 Azure public retail 추정이며 invoice가 아닙니다. 과거 null 비용의 재계산은 별도 price basis로 표시합니다."
+      },
+      "name": "intro"
+    },
+    {
+      "type": 9,
+      "name": "filters",
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "style": "pills",
+        "parameters": [
+          {
+            "id": "1c8c6df8-07c3-44ea-99cd-bce835849405",
+            "version": "KqlParameterItem/1.0",
+            "name": "TimeRange",
+            "label": "기간",
+            "type": 4,
+            "isRequired": true,
+            "value": {
+              "durationMs": 86400000
+            },
+            "typeSettings": {
+              "selectableValues": [
+                3600000,
+                21600000,
+                86400000,
+                604800000
+              ],
+              "allowCustom": true
+            }
+          },
+          {
+            "id": "cf02ed28-81dd-4d8a-8524-20230787fb87",
+            "version": "KqlParameterItem/1.0",
+            "name": "Deployment",
+            "label": "모델 배포",
+            "type": 2,
+            "isRequired": true,
+            "value": "all",
+            "jsonData": "[{\"value\":\"all\",\"label\":\"모든 모델\"},{\"value\":\"gpt-6-luna\",\"label\":\"gpt-6-luna\"},{\"value\":\"gpt-5.6-luna\",\"label\":\"gpt-5.6-luna\"},{\"value\":\"gpt-5.6-terra\",\"label\":\"gpt-5.6-terra\"}]"
+          },
+          {
+            "id": "a22f1989-865d-4a94-88ad-4071f82b630a",
+            "version": "KqlParameterItem/1.0",
+            "name": "Mode",
+            "label": "데이터 종류",
+            "type": 2,
+            "isRequired": true,
+            "value": "live",
+            "jsonData": "[{\"value\":\"live\",\"label\":\"LIVE 실제 API\"},{\"value\":\"fixture\",\"label\":\"FIXTURE 합성 시나리오\"}]"
+          },
+          {
+            "id": "c9b4a5a1-c5ab-4b3c-a791-c8faea5fbb66",
+            "version": "KqlParameterItem/1.0",
+            "name": "RunId",
+            "label": "Run UUID (빈 값: 전체)",
+            "type": 1,
+            "value": ""
+          },
+          {
+            "id": "19fbc86b-24b0-4ad2-9410-8b898b8b9dda",
+            "version": "KqlParameterItem/1.0",
+            "name": "Model",
+            "label": "모델",
+            "type": 2,
+            "isRequired": true,
+            "value": "all",
+            "jsonData": "[{\"value\":\"all\",\"label\":\"모든 모델\"},{\"value\":\"gpt-6-luna\",\"label\":\"gpt-6-luna\"},{\"value\":\"gpt-5.6-luna\",\"label\":\"gpt-5.6-luna\"},{\"value\":\"gpt-5.6-terra\",\"label\":\"gpt-5.6-terra\"}]"
+          },
+          {
+            "id": "2edc995c-e2a9-4bfc-9d64-e906e4c9e30a",
+            "version": "KqlParameterItem/1.0",
+            "name": "StreamType",
+            "label": "Streaming",
+            "type": 2,
+            "isRequired": true,
+            "value": "all",
+            "jsonData": "[{\"value\":\"all\",\"label\":\"전체\"},{\"value\":\"true\",\"label\":\"Streaming\"},{\"value\":\"false\",\"label\":\"Non-streaming\"}]"
+          },
+          {
+            "id": "2f7d946e-9310-40b3-a7f5-729d6223285d",
+            "version": "KqlParameterItem/1.0",
+            "name": "Subscription",
+            "label": "구독 (현재 배포 scope)",
+            "type": 2,
+            "isRequired": true,
+            "value": "__SUBSCRIPTION_ID__",
+            "jsonData": "[{\"value\":\"__SUBSCRIPTION_ID__\",\"label\":\"__SUBSCRIPTION_ID__\"}]"
+          },
+          {
+            "id": "50c5c6a9-3ebd-4d39-bd76-8c8b058bd031",
+            "version": "KqlParameterItem/1.0",
+            "name": "OpenAIResource",
+            "label": "OpenAI 리소스 (현재 scope)",
+            "type": 2,
+            "isRequired": true,
+            "value": "__OPENAI_RESOURCE_ID__",
+            "jsonData": "[{\"value\":\"__OPENAI_RESOURCE_ID__\",\"label\":\"__OPENAI_RESOURCE_ID__\"}]"
+          }
+        ],
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces"
+      }
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## 1 · 운영 현황\nFixture는 실제 서비스 실패나 청구가 아닙니다. Unknown usage/price를 0으로 대체하지 않습니다."
+      },
+      "name": "overview-heading"
+    },
+    {
+      "type": 3,
+      "name": "kpis",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "요청·사용량·비용 KPI",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Attempts=count(), Successes=countif(Outcome==\"success\"), InputTokens=sum(Prompt), OutputTokens=sum(Completion),\n  KnownUsage=countif(Known), PricedAttempts=countif(isnotnull(EstimatedUsd)), EstimatedUsd=sum(EstimatedUsd)\n| extend EstimatedUsd=iff(PricedAttempts==0,real(null),EstimatedUsd), UsageCoveragePct=iff(Attempts==0,real(null),100.0*KnownUsage/Attempts)",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "tiles"
+      }
+    },
+    {
+      "type": 3,
+      "name": "requests-trend",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "요청 추이 · 5분",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Attempts=count() by Time=bin(TimeGenerated,5m), Deployment\n| order by Time asc",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "timechart"
+      }
+    },
+    {
+      "type": 3,
+      "name": "outcomes",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "결과별 호출 · 서버오류/429/필터차단 구분",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Attempts=count() by Outcome, Deployment",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "barchart"
+      }
+    },
+    {
+      "type": 3,
+      "name": "model-summary",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "모델별 운영 비교",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Attempts=count(), Success=countif(Outcome==\"success\"), Errors=countif(Status>=500 or Outcome==\"network_error\"),\n  Throttled=countif(Status==429), InputBlocks=countif(Outcome==\"input_blocked\"), OutputBlocks=countif(Outcome==\"output_blocked\"),\n  P50DurationMs=percentile(DurationMs,50), P90DurationMs=percentile(DurationMs,90), P95DurationMs=percentile(DurationMs,95), P99DurationMs=percentile(DurationMs,99),\n  UsageKnown=countif(Known), FilterAnnotated=countif(Annotated) by Deployment\n| extend SuccessPct=100.0*Success/Attempts, UsageCoveragePct=100.0*UsageKnown/Attempts, AnnotationCoveragePct=100.0*FilterAnnotated/Attempts",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "table"
+      }
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## 2 · Streaming SLO\nTTFT는 첫 visible content까지의 client 시간입니다. Role-only chunk는 TTFT가 아닙니다. Chunk gap은 token TBT가 아닙니다."
+      },
+      "name": "streaming-heading"
+    },
+    {
+      "type": 3,
+      "name": "streaming",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "TTFT·종료·취소·final usage",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| where Streaming\n| summarize Streams=count(), Completed=countif(Completed), Cancelled=countif(Outcome==\"stream_cancelled\"),\n  Incomplete=countif(Outcome==\"stream_incomplete\"), KnownUsage=countif(Known), TTFTObserved=countif(isnotnull(TTFT)),\n  TTFTP50Ms=percentile(TTFT,50), TTFTP95Ms=percentile(TTFT,95), DurationP95Ms=percentile(DurationMs,95),\n  InterChunkMeanMs=avg(Gap) by Deployment\n| extend FinalUsageCoveragePct=100.0*KnownUsage/Streams",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "table"
+      }
+    },
+    {
+      "type": 3,
+      "name": "ttft-trend",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "Streaming TTFT p95 / p99 · 모델별",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| where Streaming and isnotnull(TTFT)\n| summarize TTFTP95Ms=percentile(TTFT,95), TTFTP99Ms=percentile(TTFT,99) by Time=bin(TimeGenerated,5m), Deployment\n| order by Time asc",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "timechart"
+      }
+    },
+    {
+      "type": 3,
+      "name": "errors-trend",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "HTTP 400/429/5xx · error / throttle rate",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Attempts=count(), HTTP400=countif(Status==400), HTTP429=countif(Status==429), HTTP5xx=countif(Status>=500), NetworkErrors=countif(Outcome==\"network_error\") by Time=bin(TimeGenerated,5m), Deployment\n| extend ThrottlePct=100.0*HTTP429/Attempts, ErrorPct=100.0*(HTTP5xx+NetworkErrors)/Attempts",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "timechart"
+      }
+    },
+    {
+      "type": 3,
+      "name": "tokens-per-request",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "Tokenomics · 요청당 사용량/캐시 비율",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Requests=count(), KnownUsage=countif(Known), PromptTokens=sum(Prompt), CompletionTokens=sum(Completion), CachedTokens=sum(Cached) by Deployment\n| extend PromptTokensPerKnownRequest=iff(KnownUsage==0,real(null),1.0*PromptTokens/KnownUsage), OutputTokensPerKnownRequest=iff(KnownUsage==0,real(null),1.0*CompletionTokens/KnownUsage), CachePct=iff(PromptTokens==0,real(null),100.0*CachedTokens/PromptTokens)",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "table"
+      }
+    },
+    {
+      "type": 3,
+      "name": "stream-outcomes",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "취소·미완료·필터 실패",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| where Streaming\n| summarize Streams=count() by Outcome, Deployment",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "barchart"
+      }
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## 3 · Azure 공식 가격 기반 추정\nEast US 2 / Global Standard / Short context / USD per 1M. 이 데모의 4,096 prompt token 제한 범위에만 적용합니다. Cache write 별도 meter, Flex/Priority/Long context/PTU는 제외합니다.\n\n미설정이었던 과거 telemetry는 현재 snapshot으로 재계산해 표시하되 기록된 원래 cost를 수정하지 않습니다."
+      },
+      "name": "cost-heading"
+    },
+    {
+      "type": 3,
+      "name": "token-trend",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "Input / Output / Cached token 추이",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Input=sum(Prompt), Output=sum(Completion), CachedInput=sum(Cached) by Time=bin(TimeGenerated,5m)\n| order by Time asc",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "timechart"
+      }
+    },
+    {
+      "type": 3,
+      "name": "cost-models",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "모델별 token → USD",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Attempts=count(), KnownUsage=countif(Known), PricedAttempts=countif(isnotnull(EstimatedUsd)),\n  PromptTokens=sum(Prompt), CachedTokens=sum(Cached), CompletionTokens=sum(Completion), EstimatedUsd=sum(EstimatedUsd),\n  RecordedCostUsd=sum(RecordedCost), SnapshotRepriceUsd=sum(iff(isnull(RecordedCost),RetailRepriced,real(null))) by Deployment\n| extend EstimatedUsd=iff(PricedAttempts==0,real(null),EstimatedUsd), PriceCoveragePct=100.0*PricedAttempts/Attempts",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "table"
+      }
+    },
+    {
+      "type": 3,
+      "name": "cost-trend",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "추정 비용 USD · 청구 아님",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| where isnotnull(EstimatedUsd)\n| summarize EstimatedUsd=sum(EstimatedUsd) by Time=bin(TimeGenerated,5m), Deployment\n| order by Time asc",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "timechart"
+      }
+    },
+    {
+      "type": 3,
+      "name": "price-provenance",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "가격 snapshot · 출처/유효기간/단위",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nPriceSnapshot\n| project Model, Version, Sku, InputUsd, CachedUsd, OutputUsd, MaxPrompt, From, To\n| extend Unit=\"USD per 1M\", Source=\"https://azure.microsoft.com/en-us/pricing/details/azure-openai/\"\n// Selected time context: {TimeRange}",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "table"
+      }
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## 4 · Guardrails\nHTTP 400 입력 차단과 HTTP 200 출력 차단을 구분합니다. Annotation 미반환은 safe가 아닙니다. Medium Prompt/Completion 정책과 실제 반환 coverage를 함께 봅니다."
+      },
+      "name": "safety-heading"
+    },
+    {
+      "type": 3,
+      "name": "annotations",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "필터 category / source / severity",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| mv-expand Filter=parse_json(tostring(Properties[\"aoai.filters\"]))\n| summarize Observations=count(), Blocks=countif(tobool(Filter.filtered)) by Source=tostring(Filter.source), Category=tostring(Filter.category), Severity=tostring(Filter.severity)",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "table"
+      }
+    },
+    {
+      "type": 3,
+      "name": "safety-events",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "차단·filter service failure 요청",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| where Outcome in (\"input_blocked\",\"output_blocked\",\"filter_unavailable\")\n| project TimeGenerated, Deployment, Outcome, Status, RunId, OperationId, Annotated, UsageKnown=Known\n| order by TimeGenerated desc\n| take 100",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "table"
+      }
+    },
+    {
+      "type": 3,
+      "name": "coverage",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "Usage / pricing / annotation coverage",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| summarize Attempts=count(), UsageKnown=countif(Known), Priced=countif(isnotnull(EstimatedUsd)), Annotations=countif(Annotated) by Deployment\n| extend UnknownUsage=Attempts-UsageKnown, Unpriced=Attempts-Priced, MissingAnnotations=Attempts-Annotations",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "table"
+      }
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## 5 · Request ledger & 수집 신뢰성\n원문/credential 미수집. 표는 최근 100행으로 제한합니다. 기간별 합계와 최신 run count를 혼동하지 마십시오."
+      },
+      "name": "ledger-heading"
+    },
+    {
+      "type": 3,
+      "name": "ledger",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "최근 요청 100개 · recorded vs repriced cost",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| project TimeGenerated, Deployment, Outcome, Status, TTFT, DurationMs, Streaming, Completed, Prompt, Completion, Cached, EstimatedUsd, RecordedCost, PriceBasis, RunId, OperationId\n| order by TimeGenerated desc\n| take 100",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "table"
+      }
+    },
+    {
+      "type": 3,
+      "name": "ingestion",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "수집 지연 / 마지막 관측",
+        "query": "let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n  \"gpt-6-luna\", \"2026-09-22\", \"GlobalStandard\", 0.1, 0.01, 0.5, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-luna\", \"2026-07-09\", \"GlobalStandard\", 0.2, 0.02, 1.2, 4096, datetime(2026-10-14), datetime(2026-11-14),\n  \"gpt-5.6-terra\", \"2026-07-09\", \"GlobalStandard\", 2, 0.2, 12, 4096, datetime(2026-10-14), datetime(2026-11-14)\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\nAppDependencies\n| where TimeGenerated {TimeRange}\n| where Properties[\"telemetry.kind\"] == \"aoai.request\"\n| where tostring(Properties[\"demo.mode\"]) == \"{Mode}\"\n| extend Deployment=tostring(Properties[\"aoai.deployment\"]), Model=tostring(Properties[\"gen_ai.request.model\"]),\n  Version=tostring(Properties[\"aoai.model_version\"]), Sku=tostring(Properties[\"aoai.deployment_sku\"]),\n  RunId=tostring(Properties[\"demo.run_id\"]), Outcome=tostring(Properties[\"aoai.outcome\"]),\n  Status=toint(Properties[\"aoai.status_code\"]), Prompt=tolong(Properties[\"aoai.prompt_tokens\"]),\n  Completion=tolong(Properties[\"aoai.completion_tokens\"]), Cached=tolong(Properties[\"aoai.cached_tokens\"]),\n  Known=tobool(Properties[\"aoai.usage_known\"]), Annotated=tobool(Properties[\"aoai.filter_observed\"]),\n  RecordedCost=todouble(Properties[\"aoai.estimated_cost_usd\"]), Streaming=tobool(Properties[\"aoai.streaming\"]),\n  TTFT=todouble(Properties[\"aoai.ttft_ms\"]), Gap=todouble(Properties[\"aoai.inter_chunk_mean_ms\"]),\n  Completed=tobool(Properties[\"aoai.stream_completed\"])\n| where \"{Deployment}\" == \"all\" or Deployment == \"{Deployment}\"\n| where \"{Model}\" == \"all\" or Model == \"{Model}\"\n| where \"{StreamType}\" == \"all\" or tostring(Streaming) == \"{StreamType}\"\n| where isempty(RunFilter) or RunId == RunFilter\n| lookup kind=leftouter PriceSnapshot on Model, Version, Sku\n| extend RetailRepriced=iff(Known and tostring(Properties[\"aoai.cost_reason\"]) != \"price_scope_unsupported\" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,\n  ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))\n| extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), \"recorded rate version\", iff(isnotnull(RetailRepriced),\"current Azure retail snapshot reprice\",\"unknown\"))\n| extend LagSeconds=(ingestion_time()-TimeGenerated)/1s\n| summarize Attempts=count(), IngestionP95Seconds=percentile(LagSeconds,95), LastEvent=max(TimeGenerated) by Deployment",
+        "size": 0,
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "visualization": "table"
+      }
+    },
+    {
+      "type": 3,
+      "name": "native-metrics",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "서비스 native metrics · fixture와 합산 금지",
+        "query": "AzureMetrics\n| where TimeGenerated {TimeRange}\n| where _ResourceId =~ \"__OPENAI_RESOURCE_ID__\"\n| where MetricName in (\"ProcessedPromptTokens\",\"GeneratedTokens\",\"AzureOpenAIRequests\")\n| summarize Total=sum(Total) by Time=bin(TimeGenerated,5m), MetricName\n| order by Time asc",
+        "size": 0,
+        "queryType": 0,
+        "visualization": "timechart",
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_RESOURCE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange"
+      }
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## 6 · Capacity / PAYG spillover\n현재 세 배포는 GlobalStandard PAYG입니다. PTU utilization / PTU→PAYG spillover는 **N/A**이며 0이나 token−quota 계산으로 만들지 않습니다. 실제 PTU를 도입하면 native UtilizationV2와 IsSpillover dimension을 조회합니다.\n\nAzure/agentops#343의 구획을 채택하되 legacy Latency/BlockedCalls/TotalCalls를 AOAI 전용 지표로 혼용하지 않습니다."
+      },
+      "name": "capacity-heading"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## 7 · Azure native Alert / Governance\nAction Group 테스트 발송 성공과 실제 rule Fired/inbox 수신은 별도 증거입니다. Native metrics는 모든 서비스 호출을 포함하고 workbook의 mode/run filter와 scope가 다릅니다."
+      },
+      "name": "alerts-heading"
+    },
+    {
+      "type": 3,
+      "name": "alert-config",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "배포된 경고 · Resource Graph",
+        "query": "resources | where resourceGroup =~ \"__RESOURCE_GROUP__\" | where type =~ \"microsoft.insights/scheduledqueryrules\" | project name, Enabled=tobool(properties.enabled), Severity=toint(properties.severity), Window=tostring(properties.windowSize), Evaluation=tostring(properties.evaluationFrequency), Description=tostring(properties.description)",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "__SUBSCRIPTION_ID__"
+        ],
+        "visualization": "table",
+        "size": 0
+      }
+    },
+    {
+      "type": 3,
+      "name": "receiver-config",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "Action Group · 이메일 수신자 상태",
+        "query": "resources | where id =~ \"__ACTION_GROUP_ID__\" | mv-expand Receiver=properties.emailReceivers | project name, Email=tostring(Receiver.emailAddress), Status=tostring(Receiver.status), CommonSchema=tobool(Receiver.useCommonAlertSchema)",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "__SUBSCRIPTION_ID__"
+        ],
+        "visualization": "table",
+        "size": 0
+      }
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "### 운영 gate\n모델/version/SKU 승인 · Entra/RBAC · 원문 최소화 · Short context/가격 버전 · live/fixture 분리 · SLO baseline · Safety fail-open 정책 · 수집/청구 일별 대사\n\n원문 안전 평가, 자동 invoice reconciliation, private networking, 장기 부하 benchmark는 이 데모의 검증 범위 밖입니다."
+      },
+      "name": "governance"
+    }
+  ],
+  "fallbackResourceIds": [
+    "__WORKSPACE_RESOURCE_ID__"
+  ],
+  "isLocked": false
+}

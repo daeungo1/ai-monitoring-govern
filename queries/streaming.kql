@@ -1,0 +1,12 @@
+AppDependencies
+| where TimeGenerated > ago(24h)
+| where Properties["telemetry.kind"] == "aoai.request" and Properties["demo.mode"] == "live"
+| where tobool(Properties["aoai.streaming"])
+| extend Deployment=tostring(Properties["aoai.deployment"]), TTFT=todouble(Properties["aoai.ttft_ms"]),
+    ChunkGap=todouble(Properties["aoai.inter_chunk_mean_ms"]), Outcome=tostring(Properties["aoai.outcome"])
+| summarize Streams=count(), Completed=countif(tobool(Properties["aoai.stream_completed"])),
+    Cancelled=countif(Outcome == "stream_cancelled"), Incomplete=countif(Outcome == "stream_incomplete"),
+    KnownFinalUsage=countif(tobool(Properties["aoai.usage_known"])), TTFTObserved=countif(isnotnull(TTFT)),
+    TTFTP50Ms=percentile(TTFT,50), TTFTP95Ms=percentile(TTFT,95),
+    StreamDurationP95Ms=percentile(DurationMs,95), InterContentChunkMeanMs=avg(ChunkGap) by Deployment
+| extend FinalUsageCoveragePct=100.0*KnownFinalUsage/Streams

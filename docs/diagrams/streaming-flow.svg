@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">Streaming 관측 데이터 흐름</title><desc id="desc">요청 시작, 첫 chunk, 첫 visible content, 종료, final usage, 필터 상태를 관측하고 원문 없는 ledger를 생성한다.</desc>
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#3573a5"/></marker></defs>
+  <rect width="1200" height="760" fill="#f7f9fc"/>
+  <g font-family="Segoe UI, sans-serif" fill="#203247">
+    <text x="40" y="48" font-size="25" font-weight="700">Streaming Telemetry · Lifecycle &amp; Accounting</text>
+    <text x="40" y="80" font-size="15" fill="#5f6e7d">SSE chunk은 token이 아닙니다. 원문을 저장하지 않고 시간·상태·사용량만 수집합니다.</text>
+    <g stroke="#3573a5" stroke-width="2" fill="none" marker-end="url(#a)"><path d="M130 190H1070"/><path d="M600 263V335"/></g>
+    <g fill="#eaf4ff" stroke="#3573a5"><circle cx="140" cy="190" r="12"/><circle cx="370" cy="190" r="12"/><circle cx="600" cy="190" r="12"/><circle cx="840" cy="190" r="12"/><circle cx="1060" cy="190" r="12"/></g>
+    <text x="84" y="145" font-size="16" font-weight="700">Request start</text><text x="308" y="145" font-size="16" font-weight="700">First chunk</text>
+    <text x="523" y="145" font-size="16" font-weight="700">First visible content</text><text x="779" y="145" font-size="16" font-weight="700">Finish reason</text><text x="1008" y="145" font-size="16" font-weight="700">Final usage</text>
+    <text x="84" y="237" font-size="14">인증·네트워크 포함</text><text x="306" y="237" font-size="14">role-only일 수 있음</text>
+    <text x="551" y="237" font-size="14" fill="#b11f4b">Client TTFT</text><text x="787" y="237" font-size="14">stop / block / length</text><text x="997" y="237" font-size="14">choices=[] 가능</text>
+    <rect x="40" y="335" width="350" height="180" rx="14" fill="#ffffff" stroke="#96b7d9"/>
+    <text x="60" y="368" font-size="18" font-weight="700">Performance evidence</text>
+    <text x="60" y="398" font-size="14">TTFT: first non-empty content delta</text><text x="60" y="425" font-size="14">Duration: request → stream exhausted</text>
+    <text x="60" y="452" font-size="14">Inter-content-chunk mean / max gap</text><text x="60" y="479" font-size="14">Content chunk 1개: gap은 null</text>
+    <rect x="425" y="335" width="350" height="180" rx="14" fill="#fff3f6" stroke="#b11f4b"/>
+    <text x="445" y="368" font-size="18" font-weight="700">Outcome &amp; safety evidence</text>
+    <text x="445" y="398" font-size="14">input/output blocked · filter unavailable</text><text x="445" y="425" font-size="14">cancelled ≠ network error ≠ incomplete</text>
+    <text x="445" y="452" font-size="14">Partial output 이후 annotation 확인</text><text x="445" y="479" font-size="14">Annotation 미반환 ≠ safe verdict</text>
+    <rect x="810" y="335" width="350" height="180" rx="14" fill="#ffffff" stroke="#96b7d9"/>
+    <text x="830" y="368" font-size="18" font-weight="700">Accounting evidence</text>
+    <text x="830" y="398" font-size="14">Usage는 final chunk에서 수집</text><text x="830" y="425" font-size="14">Cached input 분리 · reasoning 중복 금지</text>
+    <text x="830" y="452" font-size="14">취소·중단 후 usage 누락: unknown</text><text x="830" y="479" font-size="14">단가/usage 누락 비용: null, not zero</text>
+    <g stroke="#3573a5" stroke-width="2" fill="none" marker-end="url(#a)"><path d="M215 515V557H600V595"/><path d="M600 515V595"/><path d="M985 515V557H630V595"/></g>
+    <rect x="230" y="595" width="740" height="105" rx="14" fill="#eaf4ff" stroke="#3573a5"/>
+    <text x="250" y="628" font-size="18" font-weight="700">One sanitized span / API attempt → Azure Monitor</text>
+    <text x="250" y="656" font-size="14">Deployment + version + run UUID + stream metrics + nullable usage/cost + safety annotations</text>
+    <text x="250" y="681" font-size="14">No prompt, completion text, exception body, credentials · live / fixture 명시</text>
+  </g>
+</svg>

@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+dist-ssr/
+build/
+artifacts/
+.vite/
+*.tsbuildinfo
+
+# Secrets / local env — NEVER commit. .env.example is the only tracked env file.
+.env
+.env.*
+!.env.example
+*.local
+
+# Test / coverage artifacts
+coverage/
+playwright-report/
+test-results/
+.nyc_output/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Azure / misc
+.azure/
+
+# Agent system — local tooling, intentionally excluded from the open-source distribution
+AGENTS.md
+*.agent.md
+.github/agents/
+.github/skills/
+
+# Other AI assistant artifacts (defensive — keep local-only if introduced)
+.cursor/
+.cursorrules
+.aider*
+.claude/
+CLAUDE.md
+.windsurfrules
+.continue/
+.github/copilot-instructions.md

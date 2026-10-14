@@ -1,0 +1,39 @@
+{
+  "verifiedAt": "2026-10-14T04:24:22.266Z",
+  "api": "https://prices.azure.com/api/retail/prices?currencyCode=USD&$filter=armRegionName%20eq%20'eastus2'%20and%20type%20eq%20'Consumption'%20and%20(contains(meterName%2C'luna')%20or%20contains(meterName%2C'terra'))",
+  "pricingPage": "https://azure.microsoft.com/en-us/pricing/details/azure-openai/",
+  "crossChecks": [
+    {
+      "model": "gpt-6-luna",
+      "pageLabel": "GPT-6 Luna (short context) Global",
+      "rates": [
+        0.1,
+        0.01,
+        0.125,
+        0.5
+      ]
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "pageLabel": "GPT-5.6-luna (short context) Global",
+      "rates": [
+        0.2,
+        0.02,
+        0.25,
+        1.2
+      ]
+    },
+    {
+      "model": "gpt-5.6-terra",
+      "pageLabel": "GPT-5.6-terra (short context) Global",
+      "rates": [
+        2,
+        0.2,
+        2.5,
+        12
+      ]
+    }
+  ],
+  "mapping": "ShortCo / Inp / Cd Inp / Cd Wr / Opt / Std Gl / USD / eastus2 / unit 1M",
+  "scope": "Demo text prompts <=4096 tokens, default processing; long context/priority/flex/PTU not substituted."
+}

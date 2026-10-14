@@ -1,0 +1,11 @@
+AppDependencies
+| where TimeGenerated > ago(24h)
+| where Properties["telemetry.kind"] == "aoai.request" and Properties["demo.mode"] == "live"
+| extend Deployment=tostring(Properties["aoai.deployment"]), Outcome=tostring(Properties["aoai.outcome"])
+| where Outcome in ("input_blocked", "output_blocked", "filter_unavailable")
+| project TimeGenerated, OperationId, Deployment, Outcome,
+    HttpStatus=toint(Properties["aoai.status_code"]),
+    FilterObserved=tobool(Properties["aoai.filter_observed"]),
+    Filters=parse_json(tostring(Properties["aoai.filters"])),
+    UsageKnown=tobool(Properties["aoai.usage_known"]),
+    EstimatedUsd=todouble(Properties["aoai.estimated_cost_usd"])

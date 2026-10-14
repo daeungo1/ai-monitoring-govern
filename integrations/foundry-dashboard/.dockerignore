@@ -1,0 +1,43 @@
+# Dependencies + build output (reinstalled / rebuilt inside the image)
+node_modules
+dist
+dist-ssr
+.vite
+*.tsbuildinfo
+
+# Secrets / local env — NEVER copy a real .env into an image layer.
+.env
+.env.*
+!.env.example
+
+# Version control, CI, agent system, docs (not needed to build or run)
+.git
+.gitignore
+.gitattributes
+.github
+docs
+AGENTS.md
+*.md
+
+# Tests + reports (not needed for the production image)
+e2e
+tests
+playwright.config.ts
+coverage
+playwright-report
+test-results
+
+# Editor / OS cruft
+.idea
+.vscode
+.DS_Store
+
+# Docker + compose files themselves
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+
+# Logs
+*.log
+npm-debug.log*

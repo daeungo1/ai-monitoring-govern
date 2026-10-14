@@ -1,0 +1,13 @@
+{
+  "model": "gpt-5-nano",
+  "modelVersion": "2025-08-07",
+  "deploymentSku": "GlobalStandard",
+  "currency": "USD",
+  "inputPerMillion": 0.05,
+  "cachedInputPerMillion": 0.005,
+  "outputPerMillion": 0.4,
+  "effectiveFrom": "2026-10-14",
+  "effectiveTo": "2026-11-14",
+  "source": "https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/",
+  "status": "illustrative"
+}

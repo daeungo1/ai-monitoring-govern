@@ -1,0 +1,39 @@
+# Foundry Monitor Dashboard — Docker Compose
+#
+# Quick start:
+#   docker compose up --build
+# Then open http://localhost:8080
+#
+# This runs the dashboard with deterministic MOCK data (no Azure required).
+# For live Azure telemetry, see the "Live data" section in README.md — live
+# mode is designed to run locally with `az login` and is not enabled in the
+# container by default.
+
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: foundry-monitor-dashboard:latest
+    container_name: foundry-monitor-dashboard
+    # Reap zombies / forward signals cleanly.
+    init: true
+    ports:
+      - "8080:8080"
+    environment:
+      DATA_SOURCE: mock
+      HOST: 0.0.0.0
+      PORT: "8080"
+      SERVE_STATIC: "true"
+      ALLOW_RAW_CONTENT: "false"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8080/api/health').then(function(r){process.exit(r.ok?0:1)}).catch(function(){process.exit(1)})"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

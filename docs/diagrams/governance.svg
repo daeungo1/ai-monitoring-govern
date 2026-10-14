@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660" role="img" aria-labelledby="title desc">
+  <title id="title">AI Observability Governance 운영 순환</title><desc id="desc">승인, 구성, 관측, 대응, 검증의 단계와 담당 역할, 데이터 경계, release gate를 연결한다.</desc>
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#3573a5"/></marker></defs>
+  <rect width="1200" height="660" fill="#f7f9fc"/>
+  <g font-family="Segoe UI, sans-serif" fill="#203247">
+    <text x="40" y="48" font-size="25" font-weight="700">AI Observability Governance · Control to Evidence</text>
+    <text x="40" y="80" font-size="15" fill="#5f6e7d">기술 구성과 운영 책임을 연결합니다. 구현된 control과 production 권고를 구분합니다.</text>
+    <g fill="#ffffff" stroke="#96b7d9"><rect x="40" y="140" width="200" height="230" rx="14"/><rect x="270" y="140" width="200" height="230" rx="14"/><rect x="500" y="140" width="200" height="230" rx="14"/><rect x="730" y="140" width="200" height="230" rx="14"/><rect x="960" y="140" width="200" height="230" rx="14"/></g>
+    <g font-size="18" font-weight="700"><text x="60" y="179">01 · Approve</text><text x="290" y="179">02 · Configure</text><text x="520" y="179">03 · Observe</text><text x="750" y="179">04 · Respond</text><text x="980" y="179">05 · Verify</text></g>
+    <g font-size="14">
+      <text x="60" y="215">모델 / 버전 / SKU</text><text x="60" y="244">데이터 / 지역 / Safety</text><text x="60" y="273">SLO / 가격 출처</text><text x="60" y="327" fill="#b11f4b">App + Risk + FinOps</text>
+      <text x="290" y="215">IaC / RAI policy</text><text x="290" y="244">Entra / scoped RBAC</text><text x="290" y="273">OTel allowlist</text><text x="290" y="327" fill="#b11f4b">Platform + App team</text>
+      <text x="520" y="215">Streaming TTFT / usage</text><text x="520" y="244">Safety / cost coverage</text><text x="520" y="273">Ingestion freshness</text><text x="520" y="327" fill="#b11f4b">SRE + FinOps</text>
+      <text x="750" y="215">Triage / owner / notify</text><text x="750" y="244">Retry / fail-open 판단</text><text x="750" y="273">Block / rollback 승인</text><text x="750" y="327" fill="#b11f4b">SRE + Safety owner</text>
+      <text x="980" y="215">Run UUID + KQL</text><text x="980" y="244">Config / email evidence</text><text x="980" y="273">청구 / 정책 일별 대사</text><text x="980" y="327" fill="#b11f4b">Release + Risk review</text>
+    </g>
+    <g stroke="#3573a5" stroke-width="2" fill="none" marker-end="url(#a)"><path d="M240 254H270"/><path d="M470 254H500"/><path d="M700 254H730"/><path d="M930 254H960"/><path d="M1060 370V410H140V370"/></g>
+    <text x="440" y="439" font-size="14" fill="#3573a5">Baseline / incident lessons → change approval</text>
+    <rect x="40" y="475" width="1160" height="130" rx="14" fill="#e7eef8" stroke="#96b7d9"/>
+    <text x="60" y="509" font-size="18" font-weight="700">RELEASE GATES &amp; DATA CONTRACT</text>
+    <text x="60" y="539" font-size="14">모델 가용성·quota + API/streaming tests + privacy allowlist + price coverage + RAI policy + Alert 연결 + actual ingest query</text>
+    <text x="60" y="568" font-size="14">원문 제외  |  Fixture는 운영에서 제외  |  Unknown은 null  |  테스트 메일 ≠ Fired  |  Demo public endpoint ≠ production compliance</text>
+  </g>
+</svg>

@@ -1,0 +1,6 @@
+AppDependencies
+| where TimeGenerated > ago(24h)
+| where Properties["telemetry.kind"] == "aoai.request"
+| extend DelaySeconds=(ingestion_time()-TimeGenerated)/1s
+| summarize Attempts=count(), IngestionP95Seconds=percentile(DelaySeconds,95),
+    LastEvent=max(TimeGenerated) by Mode=tostring(Properties["demo.mode"])

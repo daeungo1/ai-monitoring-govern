@@ -1,0 +1,161 @@
+[
+  {
+    "model": "gpt-6-luna",
+    "modelVersion": "2026-09-22",
+    "deploymentSku": "GlobalStandard",
+    "currency": "USD",
+    "region": "eastus2",
+    "contextTier": "short",
+    "maxPromptTokens": 4096,
+    "inputPerMillion": 0.1,
+    "cachedInputPerMillion": 0.01,
+    "outputPerMillion": 0.5,
+    "cacheWritePerMillion": 0.125,
+    "effectiveFrom": "2026-10-14",
+    "effectiveTo": "2026-11-14",
+    "source": "https://azure.microsoft.com/en-us/pricing/details/azure-openai/",
+    "status": "verified",
+    "verifiedAt": "2026-10-14T04:24:22.243Z",
+    "priceBasis": "Azure public retail; not negotiated invoice",
+    "meters": {
+      "inputPerMillion": {
+        "meterId": "80f11337-cd24-59ba-9ab0-cbab03513224",
+        "skuName": "6-luna ShortCo Inp Std Gl",
+        "meterName": "6-luna ShortCo Inp Std Gl 1M Tokens",
+        "unitOfMeasure": "1M",
+        "effectiveStartDate": "2026-09-01T00:00:00Z",
+        "retailPrice": 0.1
+      },
+      "cachedInputPerMillion": {
+        "meterId": "a32c8f4f-58f1-52bd-89c2-801dfc997a02",
+        "skuName": "6-luna ShortCo Cd Inp Std Gl",
+        "meterName": "6-luna ShortCo Cd Inp Std Gl 1M Tokens",
+        "unitOfMeasure": "1M",
+        "effectiveStartDate": "2026-09-01T00:00:00Z",
+        "retailPrice": 0.01
+      },
+      "outputPerMillion": {
+        "meterId": "7735b966-17da-5761-b529-5803b647e4bd",
+        "skuName": "6-luna ShortCo Opt Std Gl",
+        "meterName": "6-luna ShortCo Opt Std Gl 1M Tokens",
+        "unitOfMeasure": "1M",
+        "effectiveStartDate": "2026-09-01T00:00:00Z",
+        "retailPrice": 0.5
+      },
+      "cacheWritePerMillion": {
+        "meterId": "f5fdd17d-b38e-58c1-a029-4b75cbd45a4f",
+        "skuName": "6-luna ShortCo Cd Wr Std Gl",
+        "meterName": "6-luna ShortCo Cd Wr Std Gl 1M Tokens",
+        "unitOfMeasure": "1M",
+        "effectiveStartDate": "2026-09-01T00:00:00Z",
+        "retailPrice": 0.125
+      }
+    }
+  },
+  {
+    "model": "gpt-5.6-luna",
+    "modelVersion": "2026-07-09",
+    "deploymentSku": "GlobalStandard",
+    "currency": "USD",
+    "region": "eastus2",
+    "contextTier": "short",
+    "maxPromptTokens": 4096,
+    "inputPerMillion": 0.2,
+    "cachedInputPerMillion": 0.02,
+    "outputPerMillion": 1.2,
+    "cacheWritePerMillion": 0.25,
+    "effectiveFrom": "2026-10-14",
+    "effectiveTo": "2026-11-14",
+    "source": "https://azure.microsoft.com/en-us/pricing/details/azure-openai/",
+    "status": "verified",
+    "verifiedAt": "2026-10-14T04:24:22.243Z",
+    "priceBasis": "Azure public retail; not negotiated invoice",
+    "meters": {
+      "inputPerMillion": {
+        "meterId": "1e606a78-a5c9-5eaf-8d82-4144957c289d",
+        "skuName": "5.6 luna ShortCo Inp Std Gl",
+        "meterName": "5.6 luna ShortCo Inp Std Gl 1M Tokens",
+        "unitOfMeasure": "1M",
+        "effectiveStartDate": "2026-08-01T00:00:00Z",
+        "retailPrice": 0.2
+      },
+      "cachedInputPerMillion": {
+        "meterId": "97d64f6e-0ace-5c93-80b2-815c38b4cfaf",
+        "skuName": "5.6 luna ShortCo Cd Inp Std Gl",
+        "meterName": "5.6 luna ShortCo Cd Inp Std Gl 1M Tokens",
+        "unitOfMeasure": "1M",
+        "effectiveStartDate": "2026-08-01T00:00:00Z",
+        "retailPrice": 0.02
+      },
+      "outputPerMillion": {
+        "meterId": "0edf673f-01f3-55db-b300-3aaf436652c8",
+        "skuName": "5.6 luna ShortCo Opt Std Gl",
+        "meterName": "5.6 luna ShortCo Opt Std Gl 1M Tokens",
+        "unitOfMeasure": "1M",
+        "effectiveStartDate": "2026-08-01T00:00:00Z",
+        "retailPrice": 1.2
+      },
+      "cacheWritePerMillion": {
+        "meterId": "bd1a96f4-50ec-52f1-afb3-8a7e7b8a2eee",
+        "skuName": "5.6 luna ShortCo Cd Wr Std Gl",
+        "meterName": "5.6 luna ShortCo Cd Wr Std Gl 1M Tokens",
+        "unitOfMeasure": "1M",
+        "effectiveStartDate": "2026-08-01T00:00:00Z",
+        "retailPrice": 0.25
+      }
+    }
+  },
+  {
+    "model": "gpt-5.6-terra",
+    "modelVersion": "2026-07-09",
+    "deploymentSku": "GlobalStandard",
+    "currency": "USD",
+    "region": "eastus2",
+    "contextTier": "short",
+    "maxPromptTokens": 4096,
+    "inputPerMillion": 2,
+    "cachedInputPerMillion": 0.2,
+    "outputPerMillion": 12,
+    "cacheWritePerMillion": 2.5,
+    "effectiveFrom": "2026-10-14",
+    "effectiveTo": "2026-11-14",
+    "source": "https://azure.microsoft.com/en-us/pricing/details/azure-openai/",
+    "status": "verified",
+    "verifiedAt": "2026-10-14T04:24:22.244Z",
+    "priceBasis": "Azure public retail; not negotiated invoice",
+    "meters": {
+      "inputPerMillion": {
+        "meterId": "23202329-568f-5ee3-b4fd-dd49947f5efb",
+        "skuName": "5.6 terra ShortCo Inp Std Gl",
+        "meterName": "5.6 terra ShortCo Inp Std Gl 1M Tokens",
+        "unitOfMeasure": "1M",
+        "effectiveStartDate": "2026-08-01T00:00:00Z",
+        "retailPrice": 2
+      },
+      "cachedInputPerMillion": {
+        "meterId": "6042645e-38b6-5698-b773-5e24b299cb75",
+        "skuName": "5.6 terra ShortCo Cd Inp Std Gl",
+        "meterName": "5.6 terra ShortCo Cd Inp Std Gl 1M Tokens",
+        "unitOfMeasure": "1M",
+        "effectiveStartDate": "2026-08-01T00:00:00Z",
+        "retailPrice": 0.2
+      },
+      "outputPerMillion": {
+        "meterId": "52393741-2230-5f8f-b556-5a268d8ac304",
+        "skuName": "5.6 terra ShortCo Opt Std Gl",
+        "meterName": "5.6 terra ShortCo Opt Std Gl 1M Tokens",
+        "unitOfMeasure": "1M",
+        "effectiveStartDate": "2026-08-01T00:00:00Z",
+        "retailPrice": 12
+      },
+      "cacheWritePerMillion": {
+        "meterId": "a3ce2ae6-355b-56f2-9e76-8baa4c68e264",
+        "skuName": "5.6 terra ShortCo Cd Wr Std Gl",
+        "meterName": "5.6 terra ShortCo Cd Wr Std Gl 1M Tokens",
+        "unitOfMeasure": "1M",
+        "effectiveStartDate": "2026-08-01T00:00:00Z",
+        "retailPrice": 2.5
+      }
+    }
+  }
+]

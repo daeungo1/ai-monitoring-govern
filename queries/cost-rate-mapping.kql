@@ -1,0 +1,17 @@
+let PricePerMillion = datatable(Deployment:string, InputUsd:real, CachedInputUsd:real, OutputUsd:real)
+[
+    "illustrative-example-only", 0.15, 0.075, 0.60
+];
+AppDependencies
+| where TimeGenerated > ago(24h)
+| where Properties["telemetry.kind"] == "aoai.request" and Properties["demo.mode"] == "live"
+| extend Deployment=tostring(Properties["aoai.deployment"]),
+    Prompt=tolong(Properties["aoai.prompt_tokens"]), Cached=tolong(Properties["aoai.cached_tokens"]),
+    Completion=tolong(Properties["aoai.completion_tokens"]),
+    UsageKnown=tobool(Properties["aoai.usage_known"])
+| lookup kind=leftouter PricePerMillion on Deployment
+| extend PriceKnown=isnotnull(InputUsd) and isnotnull(CachedInputUsd) and isnotnull(OutputUsd)
+| extend EstimatedUsd=iff(UsageKnown and PriceKnown,
+    ((Prompt-Cached)*InputUsd + Cached*CachedInputUsd + Completion*OutputUsd)/1000000.0, real(null))
+| summarize Attempts=count(), PricedAttempts=countif(isnotnull(EstimatedUsd)), EstimatedUsd=sum(EstimatedUsd) by Deployment
+| extend EstimatedUsd=iff(PricedAttempts == 0, real(null), EstimatedUsd)

@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.copilot-azure/
+.github/agents/
+.github/skills/
+.azure/
+AGENTS.md
+*.log
+artifacts/
+infra/main.json
+infra/managed-grafana.json
+infra/hybrid-web.json

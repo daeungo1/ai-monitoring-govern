@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Foundry Monitor</title>
+    <script>
+      // Apply the persisted (or system) theme before first paint to avoid a flash.
+      (function () {
+        try {
+          var stored = localStorage.getItem("foundry-theme");
+          var theme =
+            stored === "light" || stored === "dark" || stored === "system"
+              ? stored
+              : "system";
+          var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var dark = theme === "dark" || (theme === "system" && prefersDark);
+          var el = document.documentElement;
+          el.classList.toggle("dark", dark);
+          el.style.colorScheme = dark ? "dark" : "light";
+        } catch (e) {
+          /* no-op: storage/matchMedia unavailable */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
