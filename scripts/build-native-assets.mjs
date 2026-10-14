@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 const models = JSON.parse(await readFile("config/models.json", "utf8")).models;
 const prices = JSON.parse(await readFile("config/model-prices.json", "utf8"));
 const priceRows = prices.map(p => `  "${p.model}", "${p.modelVersion}", "${p.deploymentSku}", ${p.inputPerMillion}, ${p.cachedInputPerMillion}, ${p.outputPerMillion}, ${p.maxPromptTokens}, datetime(${p.effectiveFrom}), datetime(${p.effectiveTo})`);
-const preamble = `let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n${priceRows.join(",\n")}\n];\nlet RunFilter = tostring(dynamic({RunId:json}));\n`;
+const preamble = `let PriceSnapshot = datatable(Model:string, Version:string, Sku:string, InputUsd:real, CachedUsd:real, OutputUsd:real, MaxPrompt:long, From:datetime, To:datetime)\n[\n${priceRows.join(",\n")}\n];\nlet RunFilter = "{RunId:escapejson}";\n`;
 const base = `${preamble}AppDependencies
 | where TimeGenerated {TimeRange}
 | where Properties["telemetry.kind"] == "aoai.request"
@@ -20,20 +20,25 @@ const base = `${preamble}AppDependencies
 | where "{Deployment}" == "all" or Deployment == "{Deployment}"
 | where "{Model}" == "all" or Model == "{Model}"
 | where "{StreamType}" == "all" or tostring(Streaming) == "{StreamType}"
-| where isempty(RunFilter) or RunId == RunFilter
+| where RunFilter == "all" or isempty(RunFilter) or RunId == RunFilter
 | lookup kind=leftouter PriceSnapshot on Model, Version, Sku
 | extend RetailRepriced=iff(Known and tostring(Properties["aoai.cost_reason"]) != "price_scope_unsupported" and isnotnull(InputUsd) and Prompt <= MaxPrompt and TimeGenerated >= From and TimeGenerated < To,
   ((Prompt-Cached)*InputUsd + Cached*CachedUsd + Completion*OutputUsd)/1000000.0, real(null))
 | extend EstimatedUsd=coalesce(RecordedCost, RetailRepriced), PriceBasis=iff(isnotnull(RecordedCost), "recorded rate version", iff(isnotnull(RetailRepriced),"current Azure retail snapshot reprice","unknown"))`;
 const items = [];
 function text(name, markdown) { items.push({ type: 1, content: { json: markdown }, name }); }
-function query(name, title, suffix, visualization = "table") {
+function query(name, title, suffix, visualization = "table", extra = {}) {
   items.push({ type: 3, name, content: {
     version: "KqlItem/1.0", title, query: `${base}\n${suffix}`, size: 0, queryType: 0,
     resourceType: "microsoft.operationalinsights/workspaces", crossComponentResources: ["__WORKSPACE_RESOURCE_ID__"],
-    timeContextFromParameter: "TimeRange", visualization,
+    timeContextFromParameter: "TimeRange", visualization, ...extra,
   } });
 }
+const kpiTiles = { tileSettings: { showBorder: true,
+  titleContent: { columnMatch: "Metric", formatter: 1 },
+  leftContent: { columnMatch: "Value", formatter: 12, formatOptions: { palette: "auto" },
+    numberFormat: { unit: 17, options: { maximumSignificantDigits: 4, maximumFractionDigits: 4 } } },
+  bottomContent: { columnMatch: "Detail", formatter: 1 } } };
 text("intro", "# Azure OpenAI · Native Operations\nAzure Monitor Workbook · Streaming API · No AKS / No local dashboard\n\n기간·모델·live/fixture·Run UUID로 조회합니다. 비용은 Azure public retail 추정이며 invoice가 아닙니다. 과거 null 비용의 재계산은 별도 price basis로 표시합니다.");
 items.push({ type: 9, name: "filters", content: { version: "KqlParameterItem/1.0", style: "pills",
   parameters: [
@@ -43,7 +48,7 @@ items.push({ type: 9, name: "filters", content: { version: "KqlParameterItem/1.0
       jsonData: JSON.stringify([{ value: "all", label: "모든 모델" }, ...models.map(m => ({ value: m.deployment, label: m.deployment }))]) },
     { id: "a22f1989-865d-4a94-88ad-4071f82b630a", version: "KqlParameterItem/1.0", name: "Mode", label: "데이터 종류", type: 2, isRequired: true, value: "live",
       jsonData: JSON.stringify([{ value: "live", label: "LIVE 실제 API" }, { value: "fixture", label: "FIXTURE 합성 시나리오" }]) },
-    { id: "c9b4a5a1-c5ab-4b3c-a791-c8faea5fbb66", version: "KqlParameterItem/1.0", name: "RunId", label: "Run UUID (빈 값: 전체)", type: 1, value: "" },
+    { id: "c9b4a5a1-c5ab-4b3c-a791-c8faea5fbb66", version: "KqlParameterItem/1.0", name: "RunId", label: "Run UUID (all: 전체)", type: 1, isRequired: true, value: "all" },
     { id: "19fbc86b-24b0-4ad2-9410-8b898b8b9dda", version: "KqlParameterItem/1.0", name: "Model", label: "모델", type: 2, isRequired: true, value: "all",
       jsonData: JSON.stringify([{ value: "all", label: "모든 모델" }, ...models.map(m => ({ value: m.model, label: m.model }))]) },
     { id: "2edc995c-e2a9-4bfc-9d64-e906e4c9e30a", version: "KqlParameterItem/1.0", name: "StreamType", label: "Streaming", type: 2, isRequired: true, value: "all",
@@ -56,7 +61,16 @@ items.push({ type: 9, name: "filters", content: { version: "KqlParameterItem/1.0
 text("overview-heading", "## 1 · 운영 현황\nFixture는 실제 서비스 실패나 청구가 아닙니다. Unknown usage/price를 0으로 대체하지 않습니다.");
 query("kpis", "요청·사용량·비용 KPI", `| summarize Attempts=count(), Successes=countif(Outcome=="success"), InputTokens=sum(Prompt), OutputTokens=sum(Completion),
   KnownUsage=countif(Known), PricedAttempts=countif(isnotnull(EstimatedUsd)), EstimatedUsd=sum(EstimatedUsd)
-| extend EstimatedUsd=iff(PricedAttempts==0,real(null),EstimatedUsd), UsageCoveragePct=iff(Attempts==0,real(null),100.0*KnownUsage/Attempts)`, "tiles");
+| extend EstimatedUsd=iff(PricedAttempts==0,real(null),EstimatedUsd), UsageCoveragePct=iff(Attempts==0,real(null),100.0*KnownUsage/Attempts)
+| extend Kpis=pack_array(
+  bag_pack("Metric","요청 시도","Value",todouble(Attempts),"Detail","선택 기간의 전체 API 호출"),
+  bag_pack("Metric","성공","Value",todouble(Successes),"Detail","outcome = success"),
+  bag_pack("Metric","입력 토큰","Value",todouble(InputTokens),"Detail","usage를 받은 요청의 합계"),
+  bag_pack("Metric","출력 토큰","Value",todouble(OutputTokens),"Detail","reasoning 토큰 포함"),
+  bag_pack("Metric","추정 비용 (USD)","Value",EstimatedUsd,"Detail","단가 있는 요청만 · 청구 아님 · 비어 있으면 0이 아니라 미산정"),
+  bag_pack("Metric","usage 확보율 (%)","Value",UsageCoveragePct,"Detail","토큰 수를 받은 요청 비율"))
+| mv-expand Kpis
+| project Metric=tostring(Kpis.Metric), Value=todouble(Kpis.Value), Detail=tostring(Kpis.Detail)`, "tiles", kpiTiles);
 query("requests-trend", "요청 추이 · 5분", '| summarize Attempts=count() by Time=bin(TimeGenerated,5m), Deployment\n| order by Time asc', "timechart");
 query("outcomes", "결과별 호출 · 서버오류/429/필터차단 구분", '| summarize Attempts=count() by Outcome, Deployment', "barchart");
 query("model-summary", "모델별 운영 비교", `| summarize Attempts=count(), Success=countif(Outcome=="success"), Errors=countif(Status>=500 or Outcome=="network_error"),

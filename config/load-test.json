@@ -1,0 +1,20 @@
+{
+  "cycleDelaySeconds": 20,
+  "concurrency": 2,
+  "dailyBudgetUsd": 20,
+  "requestTimeoutMs": 60000,
+  "burst": {
+    "requestsPerSecond": 30,
+    "durationSeconds": 2,
+    "intervalSeconds": 300,
+    "maxConcurrency": 64,
+    "outputTokens": 64
+  },
+  "profiles": [
+    { "id": "short-64", "contextRepeats": 1, "outputTokens": 64, "callsPerModel": 1 },
+    { "id": "medium-128", "contextRepeats": 12, "outputTokens": 128, "callsPerModel": 1 },
+    { "id": "longer-256", "contextRepeats": 30, "outputTokens": 256, "callsPerModel": 2 },
+    { "id": "safety-vocabulary-64", "contextRepeats": 1, "outputTokens": 64, "callsPerModel": 1, "promptKind": "safety-vocabulary" },
+    { "id": "instruction-override-64", "contextRepeats": 1, "outputTokens": 64, "callsPerModel": 1, "promptKind": "instruction-override" }
+  ]
+}

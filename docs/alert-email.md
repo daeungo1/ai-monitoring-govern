@@ -58,6 +58,14 @@ fixture replay가 운영 Alert를 발생시키지 않도록 모든 log rule에 l
 정리 절차를 가진 synthetic 전용 테스트를 설계합니다.
 기본 제공 테스트 메일은 알림 경로 검증이며 이 test rule 시나리오를 대신했다고 주장하지 않습니다.
 
+지속 부하의 별도 demo rule은 [반복 부하 절차](demo-runbook.md)에 따라
+`Set-DemoScenarioAlerts.ps1`로 생성합니다. 특정 worker UUID의 fixture guardrail/429와
+live 일일 예산 70%만 평가하며 기본 운영 규칙은 그대로 유지합니다.
+fixture는 매시간 발생하므로 반복 Fired/Resolved를 관측할 수 있지만 이메일 rate limit,
+suppression, 실제 inbox 수신 여부는 별도 확인합니다.
+`Stop-LoadTest.ps1`은 STOP marker 기록 후 세 demo rule을 비활성화합니다.
+비활성화에 실패해도 STOP marker는 남으므로 worker 호출은 중단됩니다.
+
 ## 메일이 오지 않을 때
 
 Action Group의 수신자 상태, email rate limit, tenant/메일 정책,

@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 650" role="img" aria-labelledby="title desc">
+  <title id="title">Azure OpenAI 가드레일 흐름과 차단 요청을 보는 위치</title>
+  <desc id="desc">요청은 입력 필터, 모델, 출력 필터를 거친다. 입력 차단은 HTTP 400 content_filter, 출력 차단은 HTTP 200과 finish_reason content_filter이며 필터 서비스 오류와 429는 별도 결과다. 차단은 Azure Metrics 집계, 앱 로그를 적재한 Log Analytics의 요청별 상세, 기본적으로 꺼진 진단 로그 RequestResponse에서 볼 수 있다.</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8Z" fill="#3573a5"/></marker></defs>
+  <rect width="1240" height="650" fill="#f7f9fc"/>
+  <g font-family="Segoe UI, Malgun Gothic, sans-serif" fill="#203247">
+    <text x="40" y="46" font-size="25" font-weight="700">가드레일(Content filter)은 어디서 막고, 어디서 보이는가</text>
+    <text x="40" y="75" font-size="15" fill="#5f6e7d">입력과 출력을 각각 분류해 정책(심각도 임계치)에 따라 허용·차단합니다. 차단은 HTTP 오류만이 아닙니다.</text>
+
+    <g font-size="14">
+      <rect x="40" y="105" width="170" height="90" rx="12" fill="#fff" stroke="#96b7d9"/>
+      <text x="58" y="140" font-weight="700">사용자 요청</text><text x="58" y="164" font-size="13">API 호출</text>
+      <rect x="260" y="105" width="260" height="90" rx="12" fill="#eaf4ff" stroke="#3573a5" stroke-width="1.5"/>
+      <text x="278" y="133" font-weight="700">입력(Prompt) 필터</text><text x="278" y="156" font-size="13">hate · sexual · violence · self-harm</text><text x="278" y="176" font-size="13">+ 공격(jailbreak) 탐지 등</text>
+      <rect x="570" y="105" width="190" height="90" rx="12" fill="#fff" stroke="#96b7d9"/>
+      <text x="588" y="140" font-weight="700">모델 배포</text><text x="588" y="164" font-size="13">gpt-* (GlobalStandard)</text>
+      <rect x="810" y="105" width="260" height="90" rx="12" fill="#eaf4ff" stroke="#3573a5" stroke-width="1.5"/>
+      <text x="828" y="133" font-weight="700">출력(Completion) 필터</text><text x="828" y="156" font-size="13">streaming은 도중에 종료될 수 있음</text><text x="828" y="176" font-size="13">+ 보호 자료 탐지 등(선택)</text>
+      <rect x="1120" y="105" width="80" height="90" rx="12" fill="#fff" stroke="#96b7d9"/>
+      <text x="1135" y="156" font-weight="700">응답</text>
+    </g>
+    <g stroke="#3573a5" stroke-width="2" fill="none" marker-end="url(#arrow)">
+      <path d="M210 150H260"/><path d="M520 150H570"/><path d="M760 150H810"/><path d="M1070 150H1120"/>
+    </g>
+    <g stroke="#a33a3a" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arrow)">
+      <path d="M345 195L305 253"/><path d="M940 195L830 253"/>
+    </g>
+
+    <text x="40" y="232" font-size="18" font-weight="700">결과는 네 가지로 구분합니다</text>
+    <g font-size="13.5">
+      <rect x="40" y="255" width="290" height="140" rx="12" fill="#fdecec" stroke="#d98a8a"/>
+      <text x="58" y="282" font-size="15" font-weight="700" fill="#a33a3a">입력 차단</text>
+      <text x="58" y="307">HTTP 400</text><text x="58" y="327">error.code = content_filter</text>
+      <text x="58" y="353">ledger outcome: input_blocked</text><text x="58" y="373" font-size="12.5" fill="#5f6e7d">토큰 usage가 없을 수 있음 → 비용 미산정</text>
+      <rect x="360" y="255" width="290" height="140" rx="12" fill="#fff8e1" stroke="#e0b46b"/>
+      <text x="378" y="282" font-size="15" font-weight="700" fill="#a35f00">필터 서비스 오류</text>
+      <text x="378" y="307">content_filter_results.error</text>
+      <text x="378" y="333">ledger outcome: filter_unavailable</text><text x="378" y="353" font-size="12.5" fill="#5f6e7d">“안전함”이 아니라 “확인 못 함”</text>
+      <text x="378" y="373" font-size="12.5" fill="#5f6e7d">표시·중단 정책을 미리 정해야 함</text>
+      <rect x="680" y="255" width="300" height="140" rx="12" fill="#fdecec" stroke="#d98a8a"/>
+      <text x="698" y="282" font-size="15" font-weight="700" fill="#a33a3a">출력 차단</text>
+      <text x="698" y="307">HTTP 200 (성공처럼 보임)</text><text x="698" y="327">finish_reason = content_filter</text>
+      <text x="698" y="353">ledger outcome: output_blocked</text><text x="698" y="373" font-size="12.5" fill="#5f6e7d">상태코드만 보면 놓침 — 응답 본문 확인 필요</text>
+      <rect x="1010" y="255" width="190" height="140" rx="12" fill="#f0f2f5" stroke="#b8c0cc"/>
+      <text x="1028" y="282" font-size="15" font-weight="700" fill="#5f6e7d">429 ≠ 차단</text>
+      <text x="1028" y="307">한도 초과(rate limit)</text><text x="1028" y="333">outcome: throttled</text>
+      <text x="1028" y="353" font-size="12.5" fill="#5f6e7d">재시도 대상, 필터 차단은</text><text x="1028" y="373" font-size="12.5" fill="#5f6e7d">그대로 재시도하지 않음</text>
+    </g>
+
+    <text x="40" y="432" font-size="18" font-weight="700">차단된 요청은 어디서 볼 수 있나 (Log Analytics 기준)</text>
+    <g font-size="13.5">
+      <rect x="40" y="450" width="365" height="170" rx="12" fill="#fff" stroke="#96b7d9"/>
+      <text x="58" y="477" font-size="15" font-weight="700">① Azure Metrics (집계)</text>
+      <text x="58" y="502">RAIRejectedRequests · RAIHarmfulRequests</text>
+      <text x="58" y="522">RAITotalRequests · RAISystemEvent</text>
+      <text x="58" y="548" font-size="12.5" fill="#5f6e7d">가능: 추세·알림 / 한계: 요청별 원인 없음</text>
+      <text x="58" y="568" font-size="12.5" fill="#5f6e7d">탐지량 ≠ 차단량 — 이름·차원은</text><text x="58" y="588" font-size="12.5" fill="#5f6e7d">list-definitions로 실제 리소스에서 확인</text>
+      <rect x="437" y="450" width="365" height="170" rx="12" fill="#eaf4ff" stroke="#3573a5" stroke-width="1.5"/>
+      <text x="455" y="477" font-size="15" font-weight="700">② 앱 로그 → LAW (이 데모의 기본)</text>
+      <text x="455" y="502">AppDependencies · 상태코드 · outcome</text>
+      <text x="455" y="522">category · severity · usage · 추정 비용</text>
+      <text x="455" y="548" font-size="12.5" fill="#5f6e7d">요청별 조회·경고 가능, 원문은 저장하지 않음</text>
+      <text x="455" y="568" font-size="12.5" fill="#5f6e7d">호출부에서 응답을 계측해야 생김</text>
+      <text x="455" y="588" font-size="12.5" fill="#5f6e7d">(이미 LAW가 있어도 자동으로 있는 것은 아님)</text>
+      <rect x="835" y="450" width="365" height="170" rx="12" fill="#fff6e5" stroke="#e0b46b"/>
+      <text x="853" y="477" font-size="15" font-weight="700">③ 진단 로그 RequestResponse</text>
+      <text x="853" y="502">AzureDiagnostics (설정 시)</text>
+      <text x="853" y="528" font-size="12.5" fill="#a35f00">기본은 꺼짐. 요청·응답 원문이 담길 수 있어</text>
+      <text x="853" y="548" font-size="12.5" fill="#a35f00">저장 내용·비용·보관·권한·개인정보를 검토한 뒤</text>
+      <text x="853" y="568" font-size="12.5" fill="#a35f00">필요할 때만 켭니다.</text>
+    </g>
+  </g>
+</svg>

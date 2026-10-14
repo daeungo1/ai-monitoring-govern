@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 640" role="img" aria-labelledby="title desc">
+  <title id="title">토큰 사용량 × 단가로 요청별 비용을 추정하는 방법</title>
+  <desc id="desc">응답 usage의 입력, 캐시, 출력 토큰에 모델·배포유형·리전·처리 tier·context 구간별 단가를 곱해 요청별 추정 비용을 만들고, 이를 Log Analytics에 쌓아 합계와 경고로 쓰며 Cost Management와 일별 대사한다. 값이 없으면 0이 아니라 미산정이다.</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8Z" fill="#3573a5"/></marker></defs>
+  <rect width="1240" height="640" fill="#f7f9fc"/>
+  <g font-family="Segoe UI, Malgun Gothic, sans-serif" fill="#203247">
+    <text x="40" y="46" font-size="25" font-weight="700">토큰 × 단가 = 요청별 추정 비용</text>
+    <text x="40" y="75" font-size="15" fill="#5f6e7d">Azure 비용 반영을 기다리지 않고, 응답이 끝나는 즉시 계산해 Log Analytics에 쌓습니다.</text>
+
+    <rect x="40" y="100" width="360" height="200" rx="14" fill="#eaf4ff" stroke="#3573a5" stroke-width="1.5"/>
+    <text x="60" y="130" font-size="18" font-weight="700">① 응답 usage (요청마다)</text>
+    <g font-size="14">
+      <text x="60" y="162">prompt_tokens — 캐시된 토큰을 포함</text>
+      <text x="60" y="188">cached_tokens — 위 값의 일부</text>
+      <text x="60" y="214">completion_tokens — reasoning 포함</text>
+      <text x="60" y="246" font-size="12">Chat: usage.prompt_tokens_details.cached_tokens</text>
+      <text x="60" y="266" font-size="12">Responses: usage.input_tokens_details.cached_tokens</text>
+    </g>
+    <text x="420" y="205" font-size="40" font-weight="700" fill="#3573a5">×</text>
+
+    <rect x="470" y="100" width="380" height="200" rx="14" fill="#fff8e1" stroke="#d9962b" stroke-width="1.5"/>
+    <text x="490" y="130" font-size="18" font-weight="700">② 단가표 — 아래 키로 조인</text>
+    <g font-size="14">
+      <text x="490" y="160">모델 + 버전</text>
+      <text x="490" y="182">배포 유형 (Global / Data Zone / Regional)</text>
+      <text x="490" y="204">리전 · 통화</text>
+      <text x="490" y="226">처리 tier (Standard / Flex / Priority)</text>
+      <text x="490" y="248">context 구간 (short / long — 요청 입력 토큰 기준)</text>
+      <text x="490" y="270">유효 기간 · Retail Prices API로 주기 갱신</text>
+    </g>
+    <text x="870" y="205" font-size="40" font-weight="700" fill="#3573a5">=</text>
+
+    <rect x="920" y="100" width="280" height="200" rx="14" fill="#ffffff" stroke="#3573a5" stroke-width="1.5"/>
+    <text x="940" y="130" font-size="18" font-weight="700">③ 요청별 추정 USD</text>
+    <g font-size="13.5" font-family="Consolas, monospace">
+      <text x="940" y="165">(prompt − cached) × 입력단가</text>
+      <text x="940" y="190">+ cached × 캐시 입력단가</text>
+      <text x="940" y="215">+ completion × 출력단가</text>
+      <text x="940" y="240">÷ 1,000,000</text>
+    </g>
+    <text x="940" y="272" font-size="12" fill="#5f6e7d">reasoning은 completion에 이미 포함</text>
+
+    <g font-size="14">
+      <rect x="40" y="345" width="260" height="70" rx="12" fill="#fff" stroke="#96b7d9"/>
+      <text x="58" y="373" font-weight="700">LAW에 요청별 적재</text><text x="58" y="395" font-size="13">AppDependencies · 원문 제외</text>
+      <rect x="350" y="345" width="260" height="70" rx="12" fill="#fff" stroke="#96b7d9"/>
+      <text x="368" y="373" font-weight="700">모델·기간별 합계</text><text x="368" y="395" font-size="13">Workbook · Grafana 타일</text>
+      <rect x="660" y="345" width="260" height="70" rx="12" fill="#fff" stroke="#96b7d9"/>
+      <text x="678" y="373" font-weight="700">임계치 경고</text><text x="678" y="395" font-size="13">시작점: 5분 합계 5 USD 이상</text>
+      <rect x="970" y="345" width="230" height="70" rx="12" fill="#fff6e5" stroke="#d9962b"/>
+      <text x="988" y="373" font-weight="700">Cost Management</text><text x="988" y="395" font-size="13">일별 대사 (약 1일 후행)</text>
+    </g>
+    <g stroke="#3573a5" stroke-width="2" fill="none" marker-end="url(#arrow)">
+      <path d="M170 300V345"/><path d="M300 380H350"/><path d="M610 380H660"/><path d="M920 380H970"/>
+    </g>
+
+    <text x="40" y="460" font-size="18" font-weight="700">반드시 지킬 약속</text>
+    <g font-size="13.5">
+      <rect x="40" y="475" width="365" height="125" rx="12" fill="#fdecec" stroke="#d98a8a"/>
+      <text x="58" y="502" font-weight="700" fill="#a33a3a">값이 없으면 0이 아니라 “미산정”</text>
+      <text x="58" y="526">usage가 없는 400·429·타임아웃, 단가가 없는</text>
+      <text x="58" y="546">모델, 단가표 범위를 벗어난 요청은 null입니다.</text>
+      <text x="58" y="566">알려진 비용만 더한 합계를 확정 비용이라 하지 않습니다.</text>
+      <rect x="437" y="475" width="365" height="125" rx="12" fill="#fff8e1" stroke="#e0b46b"/>
+      <text x="455" y="502" font-weight="700" fill="#a35f00">메트릭 합계만으로는 근사치</text>
+      <text x="455" y="526">Metrics는 요청 단위가 아니라 캐시 비중·롱컨텍스트·</text>
+      <text x="455" y="546">tier를 구분하지 못합니다. 대략치로만 쓰고,</text>
+      <text x="455" y="566">정확도가 필요하면 요청별 usage를 로깅합니다.</text>
+      <rect x="835" y="475" width="365" height="125" rx="12" fill="#eaf4ff" stroke="#96b7d9"/>
+      <text x="853" y="502" font-weight="700" fill="#1f5f99">단가는 하드코딩하지 않습니다</text>
+      <text x="853" y="526">가격은 바뀝니다. 유효 기간을 가진 단가표를</text>
+      <text x="853" y="546">Retail Prices API로 주기 갱신하고, 기록 시점의</text>
+      <text x="853" y="566">단가 버전을 과거 데이터에 조용히 덮어쓰지 않습니다.</text>
+    </g>
+  </g>
+</svg>

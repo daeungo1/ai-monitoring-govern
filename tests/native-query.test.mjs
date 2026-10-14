@@ -2,12 +2,20 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { renderWorkbookQuery, tableRows } from "../dist/native-monitoring.js";
 test("Workbook query verification mirrors actual time/deployment/mode/run bindings", () => {
-  const query = 'TimeGenerated {TimeRange} | where Model=="{Deployment}" and Mode=="{Mode}"; let Run=tostring(dynamic({RunId:json}));';
+  const query = 'TimeGenerated {TimeRange} | where Model=="{Deployment}" and Mode=="{Mode}"; let Run="{RunId:escapejson}";';
   const rendered = renderWorkbookQuery(query, { hours: 24, deployment: "gpt-6-luna", mode: "live", runId: "" }, {});
   assert.ok(rendered.includes("> ago(24h)"));
-  assert.ok(rendered.includes('dynamic("")'));
+  assert.ok(rendered.includes('let Run=""'));
   assert.ok(!rendered.includes("{TimeRange}"));
   assert.throws(() => renderWorkbookQuery(query, { hours: 0, deployment: "x", mode: "live", runId: "" }, {}));
+});
+test("Workbook Run UUID formatting handles the all default and an exact run", () => {
+  const query = 'let RunFilter = "{RunId:escapejson}";';
+  const selection = { hours: 24, deployment: "all", mode: "live", runId: "all" };
+  assert.equal(renderWorkbookQuery(query, selection, {}), 'let RunFilter = "all";');
+  const runId = "12345678-1234-1234-1234-123456789abc";
+  assert.equal(renderWorkbookQuery(query, { ...selection, runId }, {}), `let RunFilter = "${runId}";`);
+  assert.throws(() => renderWorkbookQuery(query, { ...selection, runId: '"; print 1 //' }, {}));
 });
 test("native verifier never treats absent or malformed tables as success", () => {
   assert.throws(() => tableRows({ tables: [] }));

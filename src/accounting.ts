@@ -23,6 +23,11 @@ export interface RequestContext {
   modelVersion: string;
   deploymentSku: string;
   latencyMs: number;
+  workload?: string;
+  profile?: string;
+  workerId?: string;
+  requestedMaxTokens?: number;
+  inputChars?: number;
 }
 
 export type Outcome = "success" | "input_blocked" | "output_blocked" | "throttled"
@@ -230,6 +235,11 @@ export function toAttributes(event: RequestEvent): Attributes {
   if (event.completionTokens !== null) attributes["aoai.completion_tokens"] = event.completionTokens;
   if (event.cachedTokens !== null) attributes["aoai.cached_tokens"] = event.cachedTokens;
   if (event.estimatedCostUsd !== null) attributes["aoai.estimated_cost_usd"] = event.estimatedCostUsd;
+  if (event.workload) attributes["demo.workload"] = event.workload;
+  if (event.profile) attributes["demo.profile"] = event.profile;
+  if (event.workerId) attributes["demo.worker_id"] = event.workerId;
+  if (event.requestedMaxTokens !== undefined) attributes["demo.requested_max_tokens"] = event.requestedMaxTokens;
+  if (event.inputChars !== undefined) attributes["demo.input_chars"] = event.inputChars;
   attributes["aoai.streaming"] = event.stream !== undefined;
   if (event.stream) {
     attributes["aoai.stream_duration_ms"] = event.stream.durationMs;

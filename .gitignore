@@ -9,7 +9,12 @@ dist/
 .azure/
 AGENTS.md
 *.log
+*.tmp
 artifacts/
 infra/main.json
 infra/managed-grafana.json
 infra/hybrid-web.json
+.site-src/
+site/
+__pycache__/
+.pytest_cache/

@@ -10,13 +10,14 @@ export function renderWorkbookQuery(query: string, selection: WorkbookSelection,
   if (!Number.isInteger(selection.hours) || selection.hours < 1 || selection.hours > 168
     || !/^(all|[a-zA-Z\d._-]{1,64})$/.test(selection.deployment)
     || !["live", "fixture"].includes(selection.mode)
-    || (selection.runId !== "" && !/^[a-f\d-]{36}$/i.test(selection.runId))) {
+    || (selection.runId !== "" && selection.runId !== "all" && !/^[a-f\d-]{36}$/i.test(selection.runId))) {
     throw new Error("Invalid native Workbook selection.");
   }
   const bindings: Record<string, string> = {
     "{TimeRange}": `> ago(${selection.hours}h)`,
     "{Deployment}": selection.deployment, "{Mode}": selection.mode,
     "{Model}": "all", "{StreamType}": "all",
+    "{RunId:escapejson}": JSON.stringify(selection.runId).slice(1, -1),
     "{RunId:json}": JSON.stringify(selection.runId),
     "__WORKSPACE_RESOURCE_ID__": String(settings.workspaceResourceId),
     "__OPENAI_RESOURCE_ID__": String(settings.openAiResourceId),

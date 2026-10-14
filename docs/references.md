@@ -19,6 +19,10 @@ ms.date: 2026-10-14
 | [Cost Management data](https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/understand-cost-mgt-data) | 후행 비용, 계약 및 invoice 차이 |
 | [Azure OpenAI pricing](https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/) | 공식 단가 확인의 기준, 계약 가격은 별도 확인 |
 | [Azure Retail Pricing API](https://learn.microsoft.com/en-us/rest/api/cost-management/retail-prices/azure-retail-prices) | public retail 단가 조회, meter 단위 확인 |
+| [Foundry Models sold by Azure — Short context and long context](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure#gpt-56) | 롱컨텍스트는 요청 1건의 입력 토큰 수로 구분되며 출력 토큰과 무관. 임계 토큰 수는 가격 페이지에서 모델별 확인 |
+| [Flex processing](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/flex-processing) | Flex는 Standard 대비 50%, 요청별 `service_tier` 선택, 응답의 처리 tier를 비용 로그에 기록 |
+| [Workbook parameters](https://learn.microsoft.com/en-us/azure/azure-monitor/visualize/workbooks-parameters) | `{param:escapejson}` 등 지원되는 형식. `{param:json}`은 지원 형식이 아님 |
+| [Workbook tile visualizations](https://learn.microsoft.com/en-us/azure/azure-monitor/visualize/workbooks-tile-visualizations) | tiles는 Tile Settings(제목·왼쪽·하단 열)가 필요하며 지표별 1행 결과에 맞음 |
 
 문서의 classic/new Foundry URL이 변경되어 일부 추정 URL은 404였습니다.
 위 목록은 실제 접근 가능한 canonical/공식 경로로 정리했습니다.

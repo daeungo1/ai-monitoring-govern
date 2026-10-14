@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 630" role="img" aria-labelledby="title desc">
+  <title id="title">Azure OpenAI 사용량을 보는 세 가지 경로</title>
+  <desc id="desc">호출부 usage 계측은 요청별 토큰과 비용, 차단 상세를 수 분 안에 보여 준다. Azure Metrics는 서비스 전체 합계를 보여 주고, Cost Management는 약 1일 늦은 청구 기준 비용을 보여 준다. 첫 번째 경로의 추정 비용은 세 번째 경로와 일별로 대사한다.</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8Z" fill="#3573a5"/></marker></defs>
+  <rect width="1240" height="630" fill="#f7f9fc"/>
+  <g font-family="Segoe UI, Malgun Gothic, sans-serif" fill="#203247">
+    <text x="40" y="46" font-size="25" font-weight="700">사용량을 보는 세 가지 경로 — 무엇이, 얼마나 늦게 보이는가</text>
+    <text x="40" y="75" font-size="15" fill="#5f6e7d">하나만 쓰지 않고 ① 요청별 추정 → ② 서비스 합계로 교차 확인 → ③ 청구 기준으로 일별 대사합니다.</text>
+
+    <rect x="40" y="100" width="1160" height="190" rx="14" fill="#eaf4ff" stroke="#3573a5" stroke-width="1.5"/>
+    <text x="60" y="130" font-size="18" font-weight="700">① 호출부 usage 계측 — 요청별 토큰·비용·차단 상세 (권장 기본 경로)</text>
+    <text x="1180" y="130" font-size="13" text-anchor="end" fill="#1f5f99" font-weight="700">지연: 응답 직후 ~ 수 분(수집)</text>
+    <g font-size="14">
+      <rect x="60" y="150" width="170" height="72" rx="10" fill="#fff" stroke="#96b7d9"/>
+      <text x="75" y="180" font-weight="700">애플리케이션</text><text x="75" y="203" font-size="13">API 호출 (stream)</text>
+      <rect x="270" y="150" width="210" height="72" rx="10" fill="#fff" stroke="#96b7d9"/>
+      <text x="285" y="180" font-weight="700">응답 usage</text><text x="285" y="203" font-size="12.5">prompt·cached·completion</text>
+      <rect x="520" y="150" width="190" height="72" rx="10" fill="#fff" stroke="#96b7d9"/>
+      <text x="535" y="180" font-weight="700">OpenTelemetry</text><text x="535" y="203" font-size="13">원문은 저장하지 않음</text>
+      <rect x="750" y="150" width="200" height="72" rx="10" fill="#fff" stroke="#96b7d9"/>
+      <text x="765" y="180" font-weight="700">App Insights → LAW</text><text x="765" y="203" font-size="13">AppDependencies 테이블</text>
+      <rect x="990" y="150" width="190" height="72" rx="10" fill="#fff" stroke="#96b7d9"/>
+      <text x="1005" y="180" font-weight="700">Workbook · Grafana</text><text x="1005" y="203" font-size="13">KQL 경고 → 이메일</text>
+      <rect x="520" y="238" width="430" height="40" rx="10" fill="#fff8e1" stroke="#d9962b"/>
+      <text x="535" y="263" font-size="13">단가표 (모델·버전·배포유형·리전·tier) — Azure Retail Prices API로 갱신</text>
+    </g>
+    <g stroke="#3573a5" stroke-width="2" fill="none" marker-end="url(#arrow)">
+      <path d="M230 186H270"/><path d="M480 186H520"/><path d="M710 186H750"/><path d="M950 186H990"/><path d="M850 238V226"/>
+    </g>
+
+    <rect x="40" y="315" width="1160" height="130" rx="14" fill="#ffffff" stroke="#96b7d9" stroke-width="1.5"/>
+    <text x="60" y="345" font-size="18" font-weight="700">② Azure Metrics — 서비스 전체 합계 (보조·교차 검증)</text>
+    <text x="1180" y="345" font-size="13" text-anchor="end" fill="#1f5f99" font-weight="700">지연: 분 단위(지표 집계)</text>
+    <g font-size="14">
+      <rect x="60" y="365" width="230" height="60" rx="10" fill="#f3f7fc" stroke="#96b7d9"/>
+      <text x="75" y="391" font-weight="700">Azure OpenAI 리소스</text><text x="75" y="411" font-size="13">자동 수집 · 코드 변경 없음</text>
+      <rect x="340" y="365" width="230" height="60" rx="10" fill="#f3f7fc" stroke="#96b7d9"/>
+      <text x="355" y="391" font-weight="700">Azure Monitor Metrics</text><text x="355" y="411" font-size="13">Requests · Tokens · Latency</text>
+      <rect x="620" y="365" width="230" height="60" rx="10" fill="#f3f7fc" stroke="#96b7d9"/>
+      <text x="635" y="391" font-weight="700">Metrics 차트 · Alert</text><text x="635" y="411" font-size="13">Portal Dashboard</text>
+      <text x="890" y="378" font-size="13" fill="#2d7a3e">✔ 429 · 지연 · 토큰 총량</text>
+      <text x="890" y="398" font-size="13" fill="#a33a3a">✘ 요청별 비용 · 캐시 · 롱컨텍스트</text>
+      <text x="890" y="418" font-size="13" fill="#a33a3a">✘ 차단 상세(category) 원인</text>
+    </g>
+    <g stroke="#3573a5" stroke-width="2" fill="none" marker-end="url(#arrow)"><path d="M290 395H340"/><path d="M570 395H620"/></g>
+
+    <rect x="40" y="470" width="1160" height="125" rx="14" fill="#fff6e5" stroke="#d9962b" stroke-width="1.5"/>
+    <text x="60" y="500" font-size="18" font-weight="700">③ Cost Management — 청구 기준 비용 (후행)</text>
+    <text x="1180" y="500" font-size="13" text-anchor="end" fill="#a35f00" font-weight="700">지연: 약 1일 (계약·offer별 상이)</text>
+    <g font-size="14">
+      <rect x="60" y="520" width="230" height="60" rx="10" fill="#fff" stroke="#e0b46b"/>
+      <text x="75" y="546" font-weight="700">Azure 청구 데이터</text><text x="75" y="566" font-size="13">계약가 · 할인 반영</text>
+      <rect x="340" y="520" width="230" height="60" rx="10" fill="#fff" stroke="#e0b46b"/>
+      <text x="355" y="546" font-weight="700">Cost Management</text><text x="355" y="566" font-size="13">일별 비용 · Budget 알림</text>
+      <text x="620" y="540" font-size="13">① 추정치와 매일 대사합니다. 차이의 원인:</text>
+      <text x="620" y="562" font-size="13">계약가·할인 · 처리 tier · 롱컨텍스트 · 반영 지연</text>
+    </g>
+    <g stroke="#d9962b" stroke-width="2" fill="none" marker-end="url(#arrow)"><path d="M290 550H340"/></g>
+  </g>
+</svg>

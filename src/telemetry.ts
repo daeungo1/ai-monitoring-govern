@@ -35,9 +35,29 @@ export class Telemetry {
     span.end(end);
   }
 
+  emitBudget(accountedUsd: number, limitUsd: number | null, workerId: string): void {
+    const span = this.provider.getTracer("aoai-demo", "1.0.0").startSpan("demo.budget", {
+      kind: SpanKind.CLIENT,
+      attributes: {
+        "telemetry.kind": "aoai.budget", "demo.mode": "live", "demo.worker_id": workerId,
+        "demo.workload": "continuous-load", "demo.budget_accounted_usd": accountedUsd,
+        ...(limitUsd === null ? {} : {
+          "demo.budget_limit_usd": limitUsd, "demo.budget_utilization": accountedUsd / limitUsd,
+        }),
+      },
+    });
+    span.setStatus({ code: SpanStatusCode.OK });
+    span.end();
+  }
+
   async close(): Promise<void> {
     await this.provider.forceFlush();
     await this.provider.shutdown();
     if (this.exportFailed) throw new Error("Telemetry export did not succeed; do not claim ingestion verified.");
+  }
+
+  async flush(): Promise<void> {
+    await this.provider.forceFlush();
+    if (this.exportFailed) throw new Error("Telemetry export failed; load paused instead of claiming ingestion.");
   }
 }

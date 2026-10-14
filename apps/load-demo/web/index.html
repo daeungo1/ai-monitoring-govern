@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>모델 부하 실험실</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">◈ 모델 부하 실험실 <span>LOAD LAB</span></a>
+    <span class="pill">공개 고객 데모 · 로그인 불필요</span>
+  </header>
+  <main>
+    <section class="intro">
+      <div><p class="eyebrow">FINITE LOAD · PUBLIC CUSTOMER DEMO</p><h1>모델 부하를 한눈에.</h1><p>세 배포의 요청 비율과 속도를 설정하고, 실제 테스트 트래픽을 확인하세요.</p></div>
+      <span class="pill" id="mode-badge">준비 중</span>
+    </section>
+    <p class="notice" id="shared-budget-warning">공개 고객 데모입니다. 누구나 독립 실행을 시작하거나 자신의 실행을 중지할 수 있습니다. 앱 자체의 비용 상한과 서버 동시 실행 제한은 없습니다. Azure 서비스 quota는 적용되며 사용량에 따라 실제 비용이 계속 발생합니다. 일일 집계는 UTC 자정에 초기화됩니다. 계상·예약은 추정치이며 실제 청구액이 아닙니다.</p>
+    <div id="status" class="notice" role="status" aria-live="polite">설정을 불러오는 중입니다.</div>
+    <div id="error" class="error" role="alert" hidden></div>
+    <button type="button" id="retry-button" class="secondary" hidden>설정 다시 불러오기</button>
+    <div class="workspace">
+      <section class="card controls" aria-labelledby="controls-heading">
+        <div class="section-title"><h2 id="controls-heading">실행 설정</h2><span>01 / CONFIGURE</span></div>
+        <form id="run-form">
+          <fieldset id="settings" disabled>
+            <label for="preset">빠른 설정</label>
+            <select id="preset"><option value="normal">일반 요청</option><option value="burst">30 RPS 부하</option><option value="context">긴 입력</option><option value="guardrail">안전한 가드레일 어휘</option><option value="override">무해한 지시 재정의</option></select>
+            <label for="prompt">프롬프트</label>
+            <textarea id="prompt" rows="5" maxlength="3500" required>오늘의 날씨를 설명하는 짧은 예시 문장을 작성해 주세요.</textarea>
+            <p class="hint" id="input-count">반복 후 입력: 0 / 3500자 · UTF-8 0 / 3500바이트 (한글 약 3바이트/자)</p>
+            <div class="form-grid">
+              <div><label for="input-repeats">입력 반복</label><input id="input-repeats" type="number" min="1" max="30" step="1" value="1" required></div>
+              <div><label for="output-tokens">최대 출력 토큰</label><input id="output-tokens" type="number" min="16" max="512" step="1" value="64" required></div>
+              <div><label for="total-calls">총 호출 수</label><input id="total-calls" type="number" min="1" max="500" step="1" value="20" required></div>
+              <div><label for="requests-per-second">목표 RPS</label><input id="requests-per-second" type="number" min="1" max="50" step="1" value="2" required></div>
+              <div><label for="concurrency">목표 동시 요청 · 앱 상한 없음</label><input id="concurrency" type="number" min="1" step="1" value="4" required></div>
+            </div>
+            <h3>모델 할당</h3>
+            <div id="allocations"></div>
+            <p id="allocation-total" class="hint">비율 합계: 0% · 정확히 100% 필요</p>
+            <label class="checkbox" for="fixtures"><input id="fixtures" type="checkbox"> SYNTHETIC 알림 재현</label>
+            <p class="hint">합성 입력/출력 가드레일·429 이벤트 재생입니다. 실제 모델 차단이나 실제 Azure 제한을 보장하지 않습니다.</p>
+          </fieldset>
+          <div class="actions"><button id="start-button" type="submit" disabled>실행 시작</button><button id="stop-button" class="danger" type="button" disabled>신규 요청 중지</button></div>
+        </form>
+        <p class="hint footnote">중지는 신규 요청만 즉시 멈춥니다. 이미 전송한 요청은 완료를 기다립니다. 탭을 닫으면 신규 요청은 발생하지 않습니다.</p>
+      </section>
+      <section class="dashboard" aria-labelledby="metrics-heading">
+        <div class="section-title"><h2 id="metrics-heading">실제 테스트 트래픽</h2><span id="running-indicator" hidden><span class="running-dot" aria-hidden="true"></span> 실행 중</span></div>
+        <div class="metric-grid" id="live-traffic">
+          <article class="metric"><span>LIVE 완료 / 발행</span><strong id="calls-metric">0 / 0</strong><small id="inflight-metric">진행 중 0</small></article>
+          <article class="metric"><span>성공</span><strong id="success-count">0</strong><small>실제 요청만</small></article>
+          <article class="metric"><span>Azure 429</span><strong id="throttled-count">0</strong><small>모델 요청 제한</small></article>
+          <article class="metric"><span>입력 / 출력 차단</span><strong id="blocked-count">0</strong><small>실제 가드레일 결과</small></article>
+        </div>
+        <p class="hint traffic-summary"><span id="target-rps">목표 —</span> · 관측 완료 RPS <span id="observed-rps">—</span> · <span id="synthetic-count">합성 결과 0건 (LIVE 제외)</span></p>
+        <section class="card">
+          <div class="section-title"><h3>배포별 실제 요청</h3><span id="run-id">실행 없음</span></div>
+          <div class="table-scroll"><table><caption class="sr-only">배포별 실제 요청 완료, 성공, 제한, 차단, 오류</caption><thead><tr><th>배포</th><th>완료</th><th>성공</th><th>429</th><th>차단</th><th>오류</th></tr></thead><tbody id="model-stats"></tbody></table></div>
+        </section>
+        <section class="card">
+          <div class="section-title"><h3>최근 결과</h3><span>최대 100건 · 메타데이터만</span></div>
+          <p class="hint">Azure 이벤트 429와 플랫폼 HTTP 429는 별개입니다. 둘 중 하나를 관측하면 신규 호출을 중지합니다.</p>
+          <div class="table-scroll"><table><caption class="sr-only">최근 요청의 정제된 결과</caption><thead><tr><th>모드</th><th>배포</th><th>결과</th><th>상태</th></tr></thead><tbody id="recent-results"></tbody></table></div>
+        </section>
+        <p class="hint">오늘 계상·예약 / 상한 <span id="budget-metric">—</span> · 이벤트 비용 추정 <span id="observed-cost">$0.0000</span> · 관측용이며 비용을 차단하지 않습니다. 실제 청구액 아님.</p>
+      </section>
+    </div>
+    <footer>로그인 없는 공개 고객 데모 · 앱 비용·동시 실행 상한 없음 · 유한 호출 실행 · 새로고침 후 자동 재개 없음 · 합성 결과는 실제 모델 응답과 구분됩니다.</footer>
+  </main>
+</body>
+</html>
