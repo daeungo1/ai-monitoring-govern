@@ -1,6 +1,6 @@
 ---
 title: Azure OpenAI API 모니터링 가이드와 데모
-description: 처음 Azure OpenAI를 운영하는 팀을 위한 사용량·비용·가드레일 모니터링 방안과 실제 검증 데모
+description: Azure OpenAI를 운영하는 팀을 위한 사용량·비용·가드레일 모니터링 방안과 실제 검증 데모
 ms.date: 2026-10-15
 ---
 
@@ -9,8 +9,7 @@ ms.date: 2026-10-15
 <!-- 문서 사이트(GitHub Pages)에서는 site-page 주석 마커를 기준으로 이 README를 탭별 페이지로 나눕니다. 규칙은 scripts/docs/prepare_site.py 참고. GitHub에서는 이 파일 하나로 읽힙니다. -->
 <!-- site-link -->📖 **문서 사이트로 보기:** [Azure OpenAI 모니터링 가이드](https://daeungo1.github.io/ai-monitoring-govern/) — 검색과 탐색 메뉴가 있는 웹 문서입니다. 비슷한 형식의 다른 문서: [Azure Engineering Notes](https://daeungo1.github.io/devguidesample/)
 
-Azure OpenAI를 **API로 직접 호출**(에이전트 기능 없이)하는 팀이 처음 마주치는 질문에 답하는 가이드이자,
-그 답을 실제 Azure 환경에서 검증한 데모입니다.
+Azure OpenAI를 API로 직접 호출(에이전트 기능 없이)하는 팀 가이드: 실제 Azure 환경에서 검증한 데모입니다.
 
 * **얼마나 쓰고 있나?** 요청 수, 토큰, 지연, 429(한도 초과)를 어떤 메트릭으로 보고 언제 경고할지
 * **얼마가 들고 있나?** Azure 비용은 늦게 보이므로, 토큰 사용량에 단가를 곱해 거의 실시간으로 추정하는 방법
@@ -18,7 +17,7 @@ Azure OpenAI를 **API로 직접 호출**(에이전트 기능 없이)하는 팀�
 
 프롬프트·응답 원문과 API 키는 관측 데이터에 저장하지 않습니다.
 
-## 고객 요건
+## 고객 문의
 
 이 저장소는 아래 두 가지 요건에 답하도록 구성했습니다.
 
